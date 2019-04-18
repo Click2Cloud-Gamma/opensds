@@ -80,7 +80,8 @@ func (v *VolumePortal) CreateVolume() {
 	// Volume creation request is sent to the Dock. Dock will update volume status to "available"
 	// after volume creation is completed.
 	if err := v.CtrClient.Connect(CONF.OsdsLet.ApiEndpoint); err != nil {
-		CreateVolumeError(ctx, &volume)
+		var err1 = CreateVolumeError(ctx, &volume)
+		log.Error("when creating volume", err1)
 		log.Error("when connecting controller client:", err)
 		return
 	}
