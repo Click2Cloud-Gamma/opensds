@@ -73,6 +73,13 @@ func CreateVolumeDBEntry(ctx *c.Context, in *model.VolumeSpec) (*model.VolumeSpe
 	return db.C.CreateVolume(ctx, in)
 }
 
+func CreateVolumeError(ctx *c.Context, in *model.VolumeSpec) error {
+	var errMsg = "size of volume must be equal to or bigger than size of the snapshot"
+	log.Error(errMsg)
+	in.Status = model.VolumeError
+	return errors.New(errMsg)
+}
+
 // DeleteVolumeDBEntry just modifies the state of the volume to be deleting in
 // the DB, the real deletion operation would be executed in another new thread.
 func DeleteVolumeDBEntry(ctx *c.Context, in *model.VolumeSpec) error {

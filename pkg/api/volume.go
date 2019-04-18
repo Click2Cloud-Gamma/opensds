@@ -66,6 +66,7 @@ func (v *VolumePortal) CreateVolume() {
 	// and will return result immediately.
 	result, err := CreateVolumeDBEntry(ctx, &volume)
 	if err != nil {
+
 		errMsg := fmt.Sprintf("create volume failed: %s", err.Error())
 		v.ErrorHandle(model.ErrorBadRequest, errMsg)
 		return
@@ -79,7 +80,15 @@ func (v *VolumePortal) CreateVolume() {
 	// Volume creation request is sent to the Dock. Dock will update volume status to "available"
 	// after volume creation is completed.
 	if err := v.CtrClient.Connect(CONF.OsdsLet.ApiEndpoint); err != nil {
+		CreateVolumeError(ctx, &volume)
 		log.Error("when connecting controller client:", err)
+		return
+	}
+
+	if err != nil {
+
+		errMsg := fmt.Sprintf("create volume failed: %s", err.Error())
+		v.ErrorHandle(model.ErrorBadRequest, errMsg)
 		return
 	}
 	defer v.CtrClient.Close()
