@@ -104,20 +104,20 @@ func (c *Controller) CreateVolume(contx context.Context, opt *pb.CreateVolumeOpt
 		prf, err = db.C.GetProfile(ctx, opt.ProfileId)
 	}
 	if err != nil {
-		db.UpdateVolumeStatus(ctx, db.C, opt.Id, model.VolumeError)
+		db.UpdateVolumeStatus(ctx, db.C, opt.Id, model.VolumeError, opt.Description)
 		log.Error("get profile failed: ", err)
 		return pb.GenericResponseError(err), err
 	}
 	if opt.SnapshotId != "" {
 		snap, err = db.C.GetVolumeSnapshot(ctx, opt.SnapshotId)
 		if err != nil {
-			db.UpdateVolumeStatus(ctx, db.C, opt.Id, model.VolumeError)
+			db.UpdateVolumeStatus(ctx, db.C, opt.Id, model.VolumeError, opt.Description)
 			log.Error("get snapshot failed in create volume method: ", err)
 			return pb.GenericResponseError(err), err
 		}
 		snapVol, err = db.C.GetVolume(ctx, snap.VolumeId)
 		if err != nil {
-			db.UpdateVolumeStatus(ctx, db.C, opt.Id, model.VolumeError)
+			db.UpdateVolumeStatus(ctx, db.C, opt.Id, model.VolumeError, opt.Description)
 			log.Error("get volume failed in create volume method: ", err)
 			return pb.GenericResponseError(err), err
 		}
@@ -131,13 +131,13 @@ func (c *Controller) CreateVolume(contx context.Context, opt *pb.CreateVolumeOpt
 	// is updated.
 	vol, err := db.C.GetVolume(ctx, opt.Id)
 	if err != nil {
-		db.UpdateVolumeStatus(ctx, db.C, opt.Id, model.VolumeError)
+		db.UpdateVolumeStatus(ctx, db.C, opt.Id, model.VolumeError, opt.Description)
 		return pb.GenericResponseError(err), err
 	}
 	polInfo, err := c.selector.SelectSupportedPoolForVolume(vol)
 	if err != nil {
-		db.UpdateVolumeStatus(ctx, db.C, opt.Id, model.VolumeError)
-		db.UpdateVolumeStatus(ctx, db.C, opt.Description, "no available pool to meet user's requirement")
+		db.UpdateVolumeStatus(ctx, db.C, opt.Id, model.VolumeError, opt.Description)
+
 		log.Error("********Description**********", opt.Description)
 		return pb.GenericResponseError(err), err
 	}
@@ -148,7 +148,9 @@ func (c *Controller) CreateVolume(contx context.Context, opt *pb.CreateVolumeOpt
 
 	dockInfo, err := db.C.GetDock(ctx, polInfo.DockId)
 	if err != nil {
-		db.UpdateVolumeStatus(ctx, db.C, opt.Id, model.VolumeError)
+		db.UpdateVolumeStatus(ctx, db.C, opt.Id, model.VolumeError, opt.Description)
+
+		log.Error("********Description**********", opt.Description)
 		log.Error("when search supported dock resource:", err.Error())
 		return pb.GenericResponseError(err), err
 	}
@@ -158,15 +160,18 @@ func (c *Controller) CreateVolume(contx context.Context, opt *pb.CreateVolumeOpt
 	result, err := c.volumeController.CreateVolume(opt)
 	if err != nil {
 		// Change the status of the volume to error when the creation faild
-		defer db.UpdateVolumeStatus(ctx, db.C, opt.Id, model.VolumeError)
+		defer db.UpdateVolumeStatus(ctx, db.C, opt.Id, model.VolumeError, opt.Description)
+
+		log.Error("********Description**********", opt.Description)
 		log.Error("when create volume:", err.Error())
 		return pb.GenericResponseError(err), err
 	}
 	result.PoolId, result.ProfileId = opt.GetPoolId(), opt.GetProfileId()
 
 	// Update the volume data in database.
-	db.C.UpdateStatus(ctx, result, model.VolumeAvailable)
+	db.C.UpdateStatus(ctx, result, model.VolumeAvailable, opt.Description)
 
+	log.Error("********Description**********", opt.Description)
 	// Select the storage tag according to the lifecycle flag.
 	c.policyController = policy.NewController(prf)
 	c.policyController.Setup(CREATE_LIFECIRCLE_FLAG)
@@ -191,7 +196,8 @@ func (c *Controller) DeleteVolume(contx context.Context, opt *pb.DeleteVolumeOpt
 	ctx := osdsCtx.NewContextFromJson(opt.GetContext())
 	prf, err := db.C.GetProfile(ctx, opt.ProfileId)
 	if err != nil {
-		db.UpdateVolumeStatus(ctx, db.C, opt.Id, model.VolumeErrorDeleting)
+		db.UpdateVolumeStatus(ctx, db.C, opt.Id, model.VolumeErrorDeleting, opt.Description)
+		log.Error("********Description**********", opt.Description)
 		log.Error("when search profile in db:", err)
 		return pb.GenericResponseError(err), err
 	}
@@ -203,7 +209,8 @@ func (c *Controller) DeleteVolume(contx context.Context, opt *pb.DeleteVolumeOpt
 	dockInfo, err := db.C.GetDockByPoolId(ctx, opt.PoolId)
 	if err != nil {
 		log.Error("when search dock in db by pool id: ", err)
-		db.UpdateVolumeStatus(ctx, db.C, opt.Id, model.VolumeErrorDeleting)
+		db.UpdateVolumeStatus(ctx, db.C, opt.Id, model.VolumeErrorDeleting, opt.Description)
+		log.Error("********Description**********", opt.Description)
 		return pb.GenericResponseError(err), err
 	}
 	c.policyController.SetDock(dockInfo)
@@ -216,12 +223,14 @@ func (c *Controller) DeleteVolume(contx context.Context, opt *pb.DeleteVolumeOpt
 
 	if err := <-errChan; err != nil {
 		log.Error("when execute async policy: ", err)
-		db.UpdateVolumeStatus(ctx, db.C, opt.Id, model.VolumeErrorDeleting)
+		db.UpdateVolumeStatus(ctx, db.C, opt.Id, model.VolumeErrorDeleting, opt.Description)
+		log.Error("********Description**********", opt.Description)
 		return pb.GenericResponseError(err), err
 	}
 
 	if err = c.volumeController.DeleteVolume(opt); err != nil {
-		db.UpdateVolumeStatus(ctx, db.C, opt.Id, model.VolumeErrorDeleting)
+		db.UpdateVolumeStatus(ctx, db.C, opt.Id, model.VolumeErrorDeleting, opt.Description)
+		log.Error("********Description**********", opt.Description)
 		return pb.GenericResponseError(err), err
 	}
 	if err = db.C.DeleteVolume(ctx, opt.GetId()); err != nil {
@@ -247,7 +256,8 @@ func (c *Controller) ExtendVolume(contx context.Context, opt *pb.ExtendVolumeOpt
 	var rollBack = false
 	defer func() {
 		if rollBack {
-			db.UpdateVolumeStatus(ctx, db.C, opt.Id, model.VolumeAvailable)
+			db.UpdateVolumeStatus(ctx, db.C, opt.Id, model.VolumeAvailable, opt.Description)
+			log.Error("********Description**********", opt.Description)
 		}
 	}()
 
@@ -300,7 +310,8 @@ func (c *Controller) ExtendVolume(contx context.Context, opt *pb.ExtendVolumeOpt
 	// Update the volume data in database.
 	result.Size = newSize
 	result.PoolId, result.ProfileId = opt.GetPoolId(), opt.GetProfileId()
-	db.C.UpdateStatus(ctx, result, model.VolumeAvailable)
+	db.C.UpdateStatus(ctx, result, model.VolumeAvailable, opt.Description)
+	log.Error("********Description**********", opt.Description)
 
 	volBody, _ := json.Marshal(result)
 	var errChan = make(chan error, 1)
@@ -324,7 +335,8 @@ func (c *Controller) CreateVolumeAttachment(contx context.Context, opt *pb.Creat
 	vol, err := db.C.GetVolume(ctx, opt.VolumeId)
 	if err != nil {
 		log.Error("get volume failed in create volume attachment method: ", err)
-		db.UpdateVolumeAttachmentStatus(ctx, db.C, opt.Id, model.VolumeAttachError)
+		db.UpdateVolumeAttachmentStatus(ctx, db.C, opt.Id, model.VolumeAttachError, opt.Description)
+		log.Error("********Description**********", opt.Description)
 		return pb.GenericResponseError(err), err
 	}
 	opt.Metadata = utils.MergeStringMaps(opt.Metadata, vol.Metadata)
@@ -332,7 +344,8 @@ func (c *Controller) CreateVolumeAttachment(contx context.Context, opt *pb.Creat
 	pol, err := db.C.GetPool(ctx, vol.PoolId)
 	if err != nil {
 		log.Error("get pool failed in create volume attachment method: ", err)
-		db.UpdateVolumeAttachmentStatus(ctx, db.C, opt.Id, model.VolumeAttachError)
+		db.UpdateVolumeAttachmentStatus(ctx, db.C, opt.Id, model.VolumeAttachError, opt.Description)
+		log.Error("********Description**********", opt.Description)
 		return pb.GenericResponseError(err), err
 	}
 	var protocol = pol.Extras.IOConnectivity.AccessProtocol
@@ -345,7 +358,8 @@ func (c *Controller) CreateVolumeAttachment(contx context.Context, opt *pb.Creat
 	dockInfo, err := db.C.GetDock(ctx, pol.DockId)
 	if err != nil {
 		log.Error("when search supported dock resource:", err)
-		db.UpdateVolumeAttachmentStatus(ctx, db.C, opt.Id, model.VolumeAttachError)
+		db.UpdateVolumeAttachmentStatus(ctx, db.C, opt.Id, model.VolumeAttachError, opt.Description)
+		log.Error("********Description**********", opt.Description)
 		return pb.GenericResponseError(err), err
 	}
 	c.volumeController.SetDock(dockInfo)
@@ -353,13 +367,16 @@ func (c *Controller) CreateVolumeAttachment(contx context.Context, opt *pb.Creat
 
 	result, err := c.volumeController.CreateVolumeAttachment(opt)
 	if err != nil {
-		db.UpdateVolumeAttachmentStatus(ctx, db.C, opt.Id, model.VolumeAttachError)
+		db.UpdateVolumeAttachmentStatus(ctx, db.C, opt.Id, model.VolumeAttachError, opt.Description)
+		log.Error("********Description**********", opt.Description)
 		return pb.GenericResponseError(err), err
 	}
 
 	result.AccessProtocol = protocol
-	db.C.UpdateStatus(ctx, result, model.VolumeAttachAvailable)
-	db.UpdateVolumeStatus(ctx, db.C, vol.Id, model.VolumeInUse)
+	db.C.UpdateStatus(ctx, result, model.VolumeAttachAvailable, opt.Description)
+	log.Error("********Description**********", opt.Description)
+	db.UpdateVolumeStatus(ctx, db.C, vol.Id, model.VolumeInUse, opt.Description)
+	log.Error("********Description**********", opt.Description)
 
 	return pb.GenericResponseResult(result), nil
 }
@@ -373,7 +390,8 @@ func (c *Controller) DeleteVolumeAttachment(contx context.Context, opt *pb.Delet
 	vol, err := db.C.GetVolume(ctx, opt.VolumeId)
 	if err != nil {
 		log.Error("get volume failed in delete volume attachment method: ", err)
-		db.UpdateVolumeAttachmentStatus(ctx, db.C, opt.Id, model.VolumeAttachErrorDeleting)
+		db.UpdateVolumeAttachmentStatus(ctx, db.C, opt.Id, model.VolumeAttachErrorDeleting, opt.Description)
+		log.Error("********Description**********", opt.Description)
 		return pb.GenericResponseError(err), err
 	}
 	opt.Metadata = utils.MergeStringMaps(opt.Metadata, vol.Metadata)
@@ -381,23 +399,23 @@ func (c *Controller) DeleteVolumeAttachment(contx context.Context, opt *pb.Delet
 	dockInfo, err := db.C.GetDockByPoolId(ctx, vol.PoolId)
 	if err != nil {
 		log.Error("when search supported dock resource: ", err)
-		db.UpdateVolumeAttachmentStatus(ctx, db.C, opt.Id, model.VolumeAttachErrorDeleting)
+		db.UpdateVolumeAttachmentStatus(ctx, db.C, opt.Id, model.VolumeAttachErrorDeleting, opt.Description)
 		return pb.GenericResponseError(err), err
 	}
 	c.volumeController.SetDock(dockInfo)
 	opt.DriverName = dockInfo.DriverName
 
 	if err = c.volumeController.DeleteVolumeAttachment(opt); err != nil {
-		db.UpdateVolumeAttachmentStatus(ctx, db.C, opt.Id, model.VolumeAttachErrorDeleting)
+		db.UpdateVolumeAttachmentStatus(ctx, db.C, opt.Id, model.VolumeAttachErrorDeleting, opt.Description)
 		return pb.GenericResponseError(err), err
 	}
 	if err = db.C.DeleteVolumeAttachment(ctx, opt.Id); err != nil {
 		log.Error("error occurred in dock module when delete volume attachment in db: ", err)
-		db.UpdateVolumeAttachmentStatus(ctx, db.C, opt.Id, model.VolumeAttachErrorDeleting)
+		db.UpdateVolumeAttachmentStatus(ctx, db.C, opt.Id, model.VolumeAttachErrorDeleting, opt.Description)
 		return pb.GenericResponseError(err), err
 	}
 
-	db.UpdateVolumeStatus(ctx, db.C, vol.Id, model.VolumeAvailable)
+	db.UpdateVolumeStatus(ctx, db.C, vol.Id, model.VolumeAvailable, opt.Description)
 
 	return pb.GenericResponseResult(nil), nil
 }
@@ -416,7 +434,8 @@ func (c *Controller) CreateVolumeSnapshot(contx context.Context, opt *pb.CreateV
 		profile, err := db.C.GetProfile(ctx, opt.ProfileId)
 		if err != nil {
 			log.Error("when get profile resource: ", err)
-			db.UpdateVolumeSnapshotStatus(ctx, db.C, opt.Id, model.VolumeSnapError)
+			db.UpdateVolumeSnapshotStatus(ctx, db.C, opt.Id, model.VolumeSnapError, opt.Description)
+			log.Error("********Description**********", opt.Description)
 			return pb.GenericResponseError(err), err
 		}
 
@@ -428,7 +447,8 @@ func (c *Controller) CreateVolumeSnapshot(contx context.Context, opt *pb.CreateV
 	vol, err := db.C.GetVolume(ctx, opt.VolumeId)
 	if err != nil {
 		log.Error("get volume failed in create volume snapshot method: ", err)
-		db.UpdateVolumeSnapshotStatus(ctx, db.C, opt.Id, model.VolumeSnapError)
+		db.UpdateVolumeSnapshotStatus(ctx, db.C, opt.Id, model.VolumeSnapError, opt.Description)
+		log.Error("********Description**********", opt.Description)
 		return pb.GenericResponseError(err), err
 	}
 	opt.Size = vol.Size
@@ -437,7 +457,8 @@ func (c *Controller) CreateVolumeSnapshot(contx context.Context, opt *pb.CreateV
 	dockInfo, err := db.C.GetDockByPoolId(ctx, vol.PoolId)
 	if err != nil {
 		log.Error("when search supported dock resource: ", err)
-		db.UpdateVolumeSnapshotStatus(ctx, db.C, opt.Id, model.VolumeSnapError)
+		db.UpdateVolumeSnapshotStatus(ctx, db.C, opt.Id, model.VolumeSnapError, opt.Description)
+		log.Error("********Description**********", opt.Description)
 		return pb.GenericResponseError(err), err
 	}
 	c.volumeController.SetDock(dockInfo)
@@ -445,11 +466,13 @@ func (c *Controller) CreateVolumeSnapshot(contx context.Context, opt *pb.CreateV
 
 	result, err := c.volumeController.CreateVolumeSnapshot(opt)
 	if err != nil {
-		db.UpdateVolumeSnapshotStatus(ctx, db.C, opt.Id, model.VolumeSnapError)
+		db.UpdateVolumeSnapshotStatus(ctx, db.C, opt.Id, model.VolumeSnapError, opt.Description)
+		log.Error("********Description**********", opt.Description)
 		return pb.GenericResponseError(err), err
 	}
 
-	db.C.UpdateStatus(ctx, result, model.VolumeSnapAvailable)
+	db.C.UpdateStatus(ctx, result, model.VolumeSnapAvailable, opt.Description)
+	log.Error("********Description**********", opt.Description)
 	return pb.GenericResponseResult(result), nil
 }
 
@@ -462,7 +485,8 @@ func (c *Controller) DeleteVolumeSnapshot(contx context.Context, opt *pb.DeleteV
 	vol, err := db.C.GetVolume(ctx, opt.VolumeId)
 	if err != nil {
 		log.Error("get volume failed in delete volume snapshot method: ", err)
-		db.UpdateVolumeSnapshotStatus(ctx, db.C, opt.Id, model.VolumeSnapErrorDeleting)
+		db.UpdateVolumeSnapshotStatus(ctx, db.C, opt.Id, model.VolumeSnapErrorDeleting, opt.Description)
+		log.Error("********Description**********", opt.Description)
 		return pb.GenericResponseError(err), err
 	}
 	opt.Metadata = utils.MergeStringMaps(opt.Metadata, vol.Metadata)
@@ -470,7 +494,8 @@ func (c *Controller) DeleteVolumeSnapshot(contx context.Context, opt *pb.DeleteV
 	dockInfo, err := db.C.GetDockByPoolId(ctx, vol.PoolId)
 	if err != nil {
 		log.Error("when search supported dock resource: ", err)
-		db.UpdateVolumeSnapshotStatus(ctx, db.C, opt.Id, model.VolumeSnapErrorDeleting)
+		db.UpdateVolumeSnapshotStatus(ctx, db.C, opt.Id, model.VolumeSnapErrorDeleting, opt.Description)
+		log.Error("********Description**********", opt.Description)
 		return pb.GenericResponseError(err), err
 	}
 	c.volumeController.SetDock(dockInfo)
@@ -478,12 +503,14 @@ func (c *Controller) DeleteVolumeSnapshot(contx context.Context, opt *pb.DeleteV
 
 	if err = c.volumeController.DeleteVolumeSnapshot(opt); err != nil {
 		log.Error("error occurred in controller module when delete volume snapshot: ", err)
-		db.UpdateVolumeSnapshotStatus(ctx, db.C, opt.Id, model.VolumeSnapErrorDeleting)
+		db.UpdateVolumeSnapshotStatus(ctx, db.C, opt.Id, model.VolumeSnapErrorDeleting, opt.Description)
+		log.Error("********Description**********", opt.Description)
 		return pb.GenericResponseError(err), err
 	}
 	if err = db.C.DeleteVolumeSnapshot(ctx, opt.Id); err != nil {
 		log.Error("error occurred in controller module when delete volume snapshot in db: ", err)
-		db.UpdateVolumeSnapshotStatus(ctx, db.C, opt.Id, model.VolumeSnapErrorDeleting)
+		db.UpdateVolumeSnapshotStatus(ctx, db.C, opt.Id, model.VolumeSnapErrorDeleting, opt.Description)
+		log.Error("********Description**********", opt.Description)
 		return pb.GenericResponseError(err), err
 	}
 
@@ -499,7 +526,8 @@ func (c *Controller) CreateReplication(contx context.Context, opt *pb.CreateRepl
 	ctx := osdsCtx.NewContextFromJson(opt.GetContext())
 	pvol, err := db.C.GetVolume(ctx, opt.PrimaryVolumeId)
 	if err != nil {
-		db.UpdateReplicationStatus(ctx, db.C, opt.Id, model.ReplicationError)
+		db.UpdateReplicationStatus(ctx, db.C, opt.Id, model.ReplicationError, opt.Description)
+		log.Error("********Description**********", opt.Description)
 		return pb.GenericResponseError(err), err
 	}
 	// TODO: If user does not provide the secondary volume. Do the following steps:
@@ -509,7 +537,8 @@ func (c *Controller) CreateReplication(contx context.Context, opt *pb.CreateRepl
 	// TODO: The secondary volume may be across region.
 	svol, err := db.C.GetVolume(ctx, opt.SecondaryVolumeId)
 	if err != nil {
-		db.UpdateReplicationStatus(ctx, db.C, opt.Id, model.ReplicationError)
+		db.UpdateReplicationStatus(ctx, db.C, opt.Id, model.ReplicationError, opt.Description)
+		log.Error("********Description**********", opt.Description)
 		return pb.GenericResponseError(err), err
 	}
 
@@ -518,17 +547,20 @@ func (c *Controller) CreateReplication(contx context.Context, opt *pb.CreateRepl
 	// updated.
 	replica, err := db.C.GetReplication(ctx, opt.Id)
 	if err != nil {
-		db.UpdateReplicationStatus(ctx, db.C, opt.Id, model.ReplicationError)
+		db.UpdateReplicationStatus(ctx, db.C, opt.Id, model.ReplicationError, opt.Description)
+		log.Error("********Description**********", opt.Description)
 		return pb.GenericResponseError(err), err
 	}
 	result, err := c.drController.CreateReplication(ctx, replica, pvol, svol)
 	if err != nil {
-		db.UpdateReplicationStatus(ctx, db.C, opt.Id, model.ReplicationError)
+		db.UpdateReplicationStatus(ctx, db.C, opt.Id, model.ReplicationError, opt.Description)
+		log.Error("********Description**********", opt.Description)
 		return pb.GenericResponseError(err), err
 	}
 
 	// update status ,driver data, metadata
-	db.C.UpdateStatus(ctx, result, model.ReplicationAvailable)
+	db.C.UpdateStatus(ctx, result, model.ReplicationAvailable, opt.Description)
+	log.Error("********Description**********", opt.Description)
 	return pb.GenericResponseResult(result), nil
 }
 
@@ -540,12 +572,14 @@ func (c *Controller) DeleteReplication(contx context.Context, opt *pb.DeleteRepl
 	ctx := osdsCtx.NewContextFromJson(opt.GetContext())
 	pvol, err := db.C.GetVolume(ctx, opt.PrimaryVolumeId)
 	if err != nil {
-		db.UpdateReplicationStatus(ctx, db.C, opt.Id, model.ReplicationErrorDeleting)
+		db.UpdateReplicationStatus(ctx, db.C, opt.Id, model.ReplicationErrorDeleting, opt.Description)
+		log.Error("********Description**********", opt.Description)
 		return pb.GenericResponseError(err), err
 	}
 	svol, err := db.C.GetVolume(ctx, opt.SecondaryVolumeId)
 	if err != nil {
-		db.UpdateReplicationStatus(ctx, db.C, opt.Id, model.ReplicationErrorDeleting)
+		db.UpdateReplicationStatus(ctx, db.C, opt.Id, model.ReplicationErrorDeleting, opt.Description)
+		log.Error("********Description**********", opt.Description)
 		return pb.GenericResponseError(err), err
 	}
 
@@ -554,17 +588,20 @@ func (c *Controller) DeleteReplication(contx context.Context, opt *pb.DeleteRepl
 	// updated.
 	replica, err := db.C.GetReplication(ctx, opt.Id)
 	if err != nil {
-		db.UpdateReplicationStatus(ctx, db.C, opt.Id, model.ReplicationErrorDeleting)
+		db.UpdateReplicationStatus(ctx, db.C, opt.Id, model.ReplicationErrorDeleting, opt.Description)
+		log.Error("********Description**********", opt.Description)
 		return pb.GenericResponseError(err), err
 	}
 	if err = c.drController.DeleteReplication(ctx, replica, pvol, svol); err != nil {
-		db.UpdateReplicationStatus(ctx, db.C, opt.Id, model.ReplicationErrorDeleting)
+		db.UpdateReplicationStatus(ctx, db.C, opt.Id, model.ReplicationErrorDeleting, opt.Description)
+		log.Error("********Description**********", opt.Description)
 		return pb.GenericResponseError(err), err
 	}
 
 	if err = db.C.DeleteReplication(ctx, opt.Id); err != nil {
 		log.Error("error occurred in controller module when delete volume snapshot in db: ", err)
-		db.UpdateReplicationStatus(ctx, db.C, opt.Id, model.ReplicationErrorDeleting)
+		db.UpdateReplicationStatus(ctx, db.C, opt.Id, model.ReplicationErrorDeleting, opt.Description)
+		log.Error("********Description**********", opt.Description)
 		return pb.GenericResponseError(err), err
 	}
 
@@ -579,12 +616,14 @@ func (c *Controller) EnableReplication(contx context.Context, opt *pb.EnableRepl
 	ctx := osdsCtx.NewContextFromJson(opt.GetContext())
 	pvol, err := db.C.GetVolume(ctx, opt.PrimaryVolumeId)
 	if err != nil {
-		db.UpdateReplicationStatus(ctx, db.C, opt.Id, model.ReplicationErrorEnabling)
+		db.UpdateReplicationStatus(ctx, db.C, opt.Id, model.ReplicationErrorEnabling, opt.Description)
+		log.Error("********Description**********", opt.Description)
 		return pb.GenericResponseError(err), err
 	}
 	svol, err := db.C.GetVolume(ctx, opt.SecondaryVolumeId)
 	if err != nil {
-		db.UpdateReplicationStatus(ctx, db.C, opt.Id, model.ReplicationErrorEnabling)
+		db.UpdateReplicationStatus(ctx, db.C, opt.Id, model.ReplicationErrorEnabling, opt.Description)
+		log.Error("********Description**********", opt.Description)
 		return pb.GenericResponseError(err), err
 	}
 
@@ -593,15 +632,18 @@ func (c *Controller) EnableReplication(contx context.Context, opt *pb.EnableRepl
 	// updated.
 	replica, err := db.C.GetReplication(ctx, opt.Id)
 	if err != nil {
-		db.UpdateReplicationStatus(ctx, db.C, opt.Id, model.ReplicationErrorEnabling)
+		db.UpdateReplicationStatus(ctx, db.C, opt.Id, model.ReplicationErrorEnabling, opt.Description)
+		log.Error("********Description**********", opt.Description)
 		return pb.GenericResponseError(err), err
 	}
 	if err = c.drController.EnableReplication(ctx, replica, pvol, svol); err != nil {
-		db.UpdateReplicationStatus(ctx, db.C, opt.Id, model.ReplicationErrorEnabling)
+		db.UpdateReplicationStatus(ctx, db.C, opt.Id, model.ReplicationErrorEnabling, opt.Description)
+		log.Error("********Description**********", opt.Description)
 		return pb.GenericResponseError(err), err
 	}
 
-	db.UpdateReplicationStatus(ctx, db.C, opt.Id, model.ReplicationEnabled)
+	db.UpdateReplicationStatus(ctx, db.C, opt.Id, model.ReplicationEnabled, opt.Description)
+	log.Error("********Description**********", opt.Description)
 	return pb.GenericResponseResult(nil), nil
 }
 
@@ -613,12 +655,14 @@ func (c *Controller) DisableReplication(contx context.Context, opt *pb.DisableRe
 	ctx := osdsCtx.NewContextFromJson(opt.GetContext())
 	pvol, err := db.C.GetVolume(ctx, opt.PrimaryVolumeId)
 	if err != nil {
-		db.UpdateReplicationStatus(ctx, db.C, opt.Id, model.ReplicationErrorDisabling)
+		db.UpdateReplicationStatus(ctx, db.C, opt.Id, model.ReplicationErrorDisabling, opt.Description)
+		log.Error("********Description**********", opt.Description)
 		return pb.GenericResponseError(err), err
 	}
 	svol, err := db.C.GetVolume(ctx, opt.SecondaryVolumeId)
 	if err != nil {
-		db.UpdateReplicationStatus(ctx, db.C, opt.Id, model.ReplicationErrorDisabling)
+		db.UpdateReplicationStatus(ctx, db.C, opt.Id, model.ReplicationErrorDisabling, opt.Description)
+		log.Error("********Description**********", opt.Description)
 		return pb.GenericResponseError(err), err
 	}
 
@@ -627,15 +671,18 @@ func (c *Controller) DisableReplication(contx context.Context, opt *pb.DisableRe
 	// updated.
 	replica, err := db.C.GetReplication(ctx, opt.Id)
 	if err != nil {
-		db.UpdateReplicationStatus(ctx, db.C, opt.Id, model.ReplicationErrorDisabling)
+		db.UpdateReplicationStatus(ctx, db.C, opt.Id, model.ReplicationErrorDisabling, opt.Description)
+		log.Error("********Description**********", opt.Description)
 		return pb.GenericResponseError(err), err
 	}
 	if err = c.drController.DisableReplication(ctx, replica, pvol, svol); err != nil {
-		db.UpdateReplicationStatus(ctx, db.C, opt.Id, model.ReplicationErrorDisabling)
+		db.UpdateReplicationStatus(ctx, db.C, opt.Id, model.ReplicationErrorDisabling, opt.Description)
+		log.Error("********Description**********", opt.Description)
 		return pb.GenericResponseError(err), err
 	}
 
-	db.UpdateReplicationStatus(ctx, db.C, opt.Id, model.ReplicationDisabled)
+	db.UpdateReplicationStatus(ctx, db.C, opt.Id, model.ReplicationDisabled, opt.Description)
+	log.Error("********Description**********", opt.Description)
 	return pb.GenericResponseResult(nil), nil
 }
 
@@ -647,12 +694,14 @@ func (c *Controller) FailoverReplication(contx context.Context, opt *pb.Failover
 	ctx := osdsCtx.NewContextFromJson(opt.GetContext())
 	pvol, err := db.C.GetVolume(ctx, opt.PrimaryVolumeId)
 	if err != nil {
-		db.UpdateReplicationStatus(ctx, db.C, opt.Id, model.ReplicationErrorFailover)
+		db.UpdateReplicationStatus(ctx, db.C, opt.Id, model.ReplicationErrorFailover, opt.Description)
+		log.Error("********Description**********", opt.Description)
 		return pb.GenericResponseError(err), err
 	}
 	svol, err := db.C.GetVolume(ctx, opt.SecondaryVolumeId)
 	if err != nil {
-		db.UpdateReplicationStatus(ctx, db.C, opt.Id, model.ReplicationErrorFailover)
+		db.UpdateReplicationStatus(ctx, db.C, opt.Id, model.ReplicationErrorFailover, opt.Description)
+		log.Error("********Description**********", opt.Description)
 		return pb.GenericResponseError(err), err
 	}
 
@@ -666,25 +715,29 @@ func (c *Controller) FailoverReplication(contx context.Context, opt *pb.Failover
 	// updated.
 	replica, err := db.C.GetReplication(ctx, opt.Id)
 	if err != nil {
-		db.UpdateReplicationStatus(ctx, db.C, opt.Id, model.ReplicationErrorDisabling)
+		db.UpdateReplicationStatus(ctx, db.C, opt.Id, model.ReplicationErrorDisabling, opt.Description)
+		log.Error("********Description**********", opt.Description)
 		return pb.GenericResponseError(err), err
 	}
 	err = c.drController.FailoverReplication(ctx, replica, failover, pvol, svol)
 	if failover.SecondaryBackendId == model.ReplicationDefaultBackendId {
 		if err != nil {
-			db.UpdateReplicationStatus(ctx, db.C, opt.Id, model.ReplicationErrorFailover)
+			db.UpdateReplicationStatus(ctx, db.C, opt.Id, model.ReplicationErrorFailover, opt.Description)
+			log.Error("********Description**********", opt.Description)
 			return pb.GenericResponseError(err), err
 		}
 		replicaStatus = model.ReplicationFailover
 	} else {
 		if err != nil {
-			db.UpdateReplicationStatus(ctx, db.C, opt.Id, model.ReplicationErrorFailback)
+			db.UpdateReplicationStatus(ctx, db.C, opt.Id, model.ReplicationErrorFailback, opt.Description)
+			log.Error("********Description**********", opt.Description)
 			return pb.GenericResponseError(err), err
 		}
 		replicaStatus = model.ReplicationEnabled
 	}
 
-	db.UpdateReplicationStatus(ctx, db.C, opt.Id, replicaStatus)
+	db.UpdateReplicationStatus(ctx, db.C, opt.Id, replicaStatus, opt.Description)
+	log.Error("********Description**********", opt.Description)
 	return pb.GenericResponseResult(nil), nil
 }
 
@@ -699,13 +752,15 @@ func (c *Controller) CreateVolumeGroup(contx context.Context, opt *pb.CreateVolu
 	// is updated.
 	vg, err := db.C.GetVolumeGroup(ctx, opt.Id)
 	if err != nil {
-		db.UpdateVolumeGroupStatus(ctx, db.C, opt.Id, model.VolumeGroupError)
+		db.UpdateVolumeGroupStatus(ctx, db.C, opt.Id, model.VolumeGroupError, opt.Description)
+		log.Error("********Description**********", opt.Description)
 		return pb.GenericResponseError(err), err
 	}
 	polInfo, err := c.selector.SelectSupportedPoolForVG(vg)
 	if err != nil {
 		log.Error("no valid pool find for group: ", err)
-		db.UpdateVolumeGroupStatus(ctx, db.C, opt.Id, model.VolumeGroupError)
+		db.UpdateVolumeGroupStatus(ctx, db.C, opt.Id, model.VolumeGroupError, opt.Description)
+		log.Error("********Description**********", opt.Description)
 		return pb.GenericResponseError(err), err
 	}
 	opt.PoolId = polInfo.Id
@@ -713,7 +768,8 @@ func (c *Controller) CreateVolumeGroup(contx context.Context, opt *pb.CreateVolu
 	dockInfo, err := db.C.GetDock(ctx, polInfo.DockId)
 	if err != nil {
 		log.Error("no valid dock find for group: ", err)
-		db.UpdateVolumeGroupStatus(ctx, db.C, opt.Id, model.VolumeGroupError)
+		db.UpdateVolumeGroupStatus(ctx, db.C, opt.Id, model.VolumeGroupError, opt.Description)
+		log.Error("********Description**********", opt.Description)
 		return pb.GenericResponseError(err), err
 	}
 	c.volumeController.SetDock(dockInfo)
@@ -721,7 +777,8 @@ func (c *Controller) CreateVolumeGroup(contx context.Context, opt *pb.CreateVolu
 
 	result, err := c.volumeController.CreateVolumeGroup(opt)
 	if err != nil {
-		db.UpdateVolumeGroupStatus(ctx, db.C, opt.Id, model.VolumeGroupError)
+		db.UpdateVolumeGroupStatus(ctx, db.C, opt.Id, model.VolumeGroupError, opt.Description)
+		log.Error("********Description**********", opt.Description)
 		return pb.GenericResponseError(err), err
 	}
 	result.PoolId = polInfo.Id
@@ -751,7 +808,8 @@ func (c *Controller) CreateVolumeGroup(contx context.Context, opt *pb.CreateVolu
 	//		errchanVolume <- err
 	//		return
 	//	}
-	db.C.UpdateStatus(ctx, result, model.VolumeGroupAvailable)
+	db.C.UpdateStatus(ctx, result, model.VolumeGroupAvailable, opt.Description)
+	log.Error("********Description**********", opt.Description)
 	return pb.GenericResponseResult(result), nil
 }
 
@@ -763,7 +821,8 @@ func (c *Controller) UpdateVolumeGroup(contx context.Context, opt *pb.UpdateVolu
 	ctx := osdsCtx.NewContextFromJson(opt.GetContext())
 	dock, err := db.C.GetDockByPoolId(ctx, opt.PoolId)
 	if err != nil {
-		db.UpdateVolumeGroupStatus(ctx, db.C, opt.Id, model.VolumeGroupError)
+		db.UpdateVolumeGroupStatus(ctx, db.C, opt.Id, model.VolumeGroupError, opt.Description)
+		log.Error("********Description**********", opt.Description)
 		return pb.GenericResponseError(err), err
 	}
 	c.volumeController.SetDock(dock)
@@ -772,7 +831,8 @@ func (c *Controller) UpdateVolumeGroup(contx context.Context, opt *pb.UpdateVolu
 	vg, err := c.volumeController.UpdateVolumeGroup(opt)
 	if err != nil {
 		log.Error("when create volume group: ", err)
-		db.UpdateVolumeGroupStatus(ctx, db.C, opt.Id, model.VolumeGroupError)
+		db.UpdateVolumeGroupStatus(ctx, db.C, opt.Id, model.VolumeGroupError, opt.Description)
+		log.Error("********Description**********", opt.Description)
 
 		//for _, addVol := range opt.AddVolumes {
 		//	db.UpdateVolumeStatus(ctx, db.C, addVol, model.VolumeError)
@@ -818,7 +878,8 @@ func (c *Controller) UpdateVolumeGroup(contx context.Context, opt *pb.UpdateVolu
 	//		errchanVolume <- err
 	//		return
 	//	}
-	db.C.UpdateStatus(ctx, vg, model.VolumeGroupAvailable)
+	db.C.UpdateStatus(ctx, vg, model.VolumeGroupAvailable, opt.Description)
+	log.Error("********Description**********", opt.Description)
 	return pb.GenericResponseResult(vg), nil
 }
 
@@ -830,7 +891,8 @@ func (c *Controller) DeleteVolumeGroup(contx context.Context, opt *pb.DeleteVolu
 
 	dock, err := db.C.GetDockByPoolId(ctx, opt.PoolId)
 	if err != nil {
-		db.UpdateVolumeGroupStatus(ctx, db.C, opt.Id, model.VolumeGroupErrorDeleting)
+		db.UpdateVolumeGroupStatus(ctx, db.C, opt.Id, model.VolumeGroupErrorDeleting, opt.Description)
+		log.Error("********Description**********", opt.Description)
 		return pb.GenericResponseError(err), err
 	}
 	c.volumeController.SetDock(dock)
@@ -838,14 +900,16 @@ func (c *Controller) DeleteVolumeGroup(contx context.Context, opt *pb.DeleteVolu
 
 	if err = c.volumeController.DeleteVolumeGroup(opt); err != nil {
 		log.Error("when delete volume group: ", err)
-		db.UpdateVolumeGroupStatus(ctx, db.C, opt.Id, model.VolumeGroupErrorDeleting)
+		db.UpdateVolumeGroupStatus(ctx, db.C, opt.Id, model.VolumeGroupErrorDeleting, opt.Description)
+		log.Error("********Description**********", opt.Description)
 		return pb.GenericResponseError(err), err
 
 	}
 
 	if err = db.C.DeleteVolumeGroup(ctx, opt.Id); err != nil {
 		log.Error("error occurred in controller module when delete volume group in db: ", err)
-		db.UpdateVolumeGroupStatus(ctx, db.C, opt.Id, model.VolumeGroupErrorDeleting)
+		db.UpdateVolumeGroupStatus(ctx, db.C, opt.Id, model.VolumeGroupErrorDeleting, opt.Description)
+		log.Error("********Description**********", opt.Description)
 		return pb.GenericResponseError(err), err
 	}
 

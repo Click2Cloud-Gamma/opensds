@@ -236,6 +236,8 @@ type DeleteVolumeOpts struct {
 	Context string `protobuf:"bytes,6,opt,name=context" json:"context,omitempty"`
 	// The Serialized profile
 	Profile string `protobuf:"bytes,7,opt,name=profile" json:"profile,omitempty"`
+	// The description of the volume, optional.
+	Description string `protobuf:"bytes,4,opt,name=description" json:"description,omitempty"`
 }
 
 func (m *DeleteVolumeOpts) Reset()                    { *m = DeleteVolumeOpts{} }
@@ -526,6 +528,9 @@ func (m *CreateVolumeSnapshotOpts) GetProfile() string {
 type DeleteVolumeSnapshotOpts struct {
 	// The uuid of the volume snapshot, required.
 	Id string `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
+
+	// The description of the volume, optional.
+	Description string `protobuf:"bytes,4,opt,name=description" json:"description,omitempty"`
 	// The uuid of the volume that snapshot belongs to, required.
 	VolumeId string `protobuf:"bytes,2,opt,name=volumeId" json:"volumeId,omitempty"`
 	// The metadata of the volume snapshot, optional.
@@ -581,6 +586,8 @@ func (m *DeleteVolumeSnapshotOpts) GetContext() string {
 type CreateVolumeAttachmentOpts struct {
 	// The uuid of the volume attachment, optional.
 	Id string `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
+	// The description of the volume, optional.
+	Description string `protobuf:"bytes,4,opt,name=description" json:"description,omitempty"`
 	// The uuid of the volume, required.
 	VolumeId string `protobuf:"bytes,2,opt,name=volumeId" json:"volumeId,omitempty"`
 	// This field indicates if the volume is attached locally, optional.
@@ -672,6 +679,8 @@ func (m *CreateVolumeAttachmentOpts) GetAccessProtocol() string {
 type DeleteVolumeAttachmentOpts struct {
 	// The uuid of the volume attachment, optional.
 	Id string `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
+	// The description of the volume, optional.
+	Description string `protobuf:"bytes,4,opt,name=description" json:"description,omitempty"`
 	// The uuid of the volume, required.
 	VolumeId string `protobuf:"bytes,2,opt,name=volumeId" json:"volumeId,omitempty"`
 	// The infomation of the host node on which the volume will be attached.
@@ -1968,6 +1977,8 @@ func (m *CreateVolumeGroupOpts) GetContext() string {
 type UpdateVolumeGroupOpts struct {
 	// The uuid of the volume group, optional when updating.
 	Id string `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
+	// The description of the volume, optional.
+	Description string `protobuf:"bytes,4,opt,name=description" json:"description,omitempty"`
 	// The driver of the volume group.
 	DriverName string `protobuf:"bytes,2,opt,name=driverName" json:"driverName,omitempty"`
 	// The addVolumes contain UUIDs of volumes to be added to the group.
@@ -2030,6 +2041,8 @@ func (m *UpdateVolumeGroupOpts) GetContext() string {
 type DeleteVolumeGroupOpts struct {
 	// The uuid of the volume group, optional when deleting.
 	Id string `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
+	// The description of the volume, optional.
+	Description string `protobuf:"bytes,4,opt,name=description" json:"description,omitempty"`
 	// The pool belongs to the group.
 	PoolId string `protobuf:"bytes,2,opt,name=poolId" json:"poolId,omitempty"`
 	// The driver of the volume group.

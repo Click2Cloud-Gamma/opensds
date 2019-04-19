@@ -1197,7 +1197,7 @@ func (_m *Client) UpdateReplication(ctx *context.Context, replicationId string, 
 }
 
 // UpdateStatus provides a mock function with given fields: ctx, object, status
-func (_m *Client) UpdateStatus(ctx *context.Context, object interface{}, status string) error {
+func (_m *Client) UpdateStatus(ctx *context.Context, object interface{}, status string, Description string) error {
 	ret := _m.Called(ctx, object, status)
 
 	var r0 error

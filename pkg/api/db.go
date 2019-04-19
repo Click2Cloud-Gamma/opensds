@@ -69,6 +69,7 @@ func CreateVolumeDBEntry(ctx *c.Context, in *model.VolumeSpec) (*model.VolumeSpe
 
 	in.UserId = ctx.UserId
 	in.Status = model.VolumeCreating
+	in.Description = "Volume is Creating"
 	// Store the volume data into database.
 	return db.C.CreateVolume(ctx, in)
 }
@@ -615,8 +616,8 @@ func DeleteVolumeGroupDBEntry(ctx *c.Context, volumeGroupId string) error {
 		})
 	}
 
-	db.C.UpdateStatus(ctx, volumesUpdate, "")
-	db.C.UpdateStatus(ctx, vg, model.VolumeGroupDeleting)
+	db.C.UpdateStatus(ctx, volumesUpdate, "", "")
+	db.C.UpdateStatus(ctx, vg, model.VolumeGroupDeleting, "")
 
 	return nil
 }

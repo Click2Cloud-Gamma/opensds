@@ -2210,7 +2210,7 @@ func (c *Client) UpdateVolumeGroup(ctx *c.Context, vgUpdate *model.VolumeGroupSp
 	return vg, nil
 }
 
-func (c *Client) UpdateStatus(ctx *c.Context, in interface{}, status string) error {
+func (c *Client) UpdateStatus(ctx *c.Context, in interface{}, status string, Description string) error {
 	switch in.(type) {
 	case *model.VolumeSnapshotSpec:
 		snap := in.(*model.VolumeSnapshotSpec)

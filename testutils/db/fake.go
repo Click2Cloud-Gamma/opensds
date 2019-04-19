@@ -383,7 +383,7 @@ func (fc *FakeDbClient) GetVolumeGroup(ctx *c.Context, vgId string) (*model.Volu
 	return &SampleVolumeGroups[0], nil
 }
 
-func (fc *FakeDbClient) UpdateStatus(ctx *c.Context, in interface{}, status string) error {
+func (fc *FakeDbClient) UpdateStatus(ctx *c.Context, in interface{}, status string, Description string) error {
 	return nil
 }
 

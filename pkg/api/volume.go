@@ -96,6 +96,7 @@ func (v *VolumePortal) CreateVolume() {
 	// Volume creation request is sent to the Dock. Dock will update volume status to "available"
 	// after volume creation is completed.
 	if err := v.CtrClient.Connect(CONF.OsdsLet.ApiEndpoint); err != nil {
+
 		log.Error("when connecting controller client:", err)
 		return
 	}
@@ -113,8 +114,8 @@ func (v *VolumePortal) CreateVolume() {
 		PoolId:            result.PoolId,
 		SnapshotId:        result.SnapshotId,
 		Metadata:          result.Metadata,
-		SnapshotFromCloud: result.SnapshotFromCloud,
 		Context:           ctx.ToJson(),
+		SnapshotFromCloud: result.SnapshotFromCloud,
 	}
 	if _, err = v.CtrClient.CreateVolume(context.Background(), opt); err != nil {
 		log.Error("create volume failed in controller service:", err)
