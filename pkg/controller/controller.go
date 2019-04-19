@@ -136,8 +136,9 @@ func (c *Controller) CreateVolume(contx context.Context, opt *pb.CreateVolumeOpt
 	}
 	polInfo, err := c.selector.SelectSupportedPoolForVolume(vol)
 	if err != nil {
-		db.UpdateVolumeStatus(ctx, db.C, opt.Id, model.VolumeError, opt.Description)
 		snapVol.Description = "requested size exceeded the pool size"
+		db.UpdateVolumeStatus(ctx, db.C, opt.Id, model.VolumeError, snapVol.Description)
+
 		_, err := db.C.UpdateVolume(ctx, snapVol)
 		if err != nil {
 			return nil, err
