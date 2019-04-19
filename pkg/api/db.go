@@ -42,6 +42,15 @@ func CreateVolumeDBEntry(ctx *c.Context, in *model.VolumeSpec) (*model.VolumeSpe
 		log.Error(errMsg)
 		return nil, errors.New(errMsg)
 	}
+	psize := model.StoragePoolSpec{}
+
+	if psize.FreeCapacity > 0 {
+		if in.Size > psize.FreeCapacity {
+			errMsg := fmt.Sprintf("Volume size is greater than Pool Size: %d", in.Size)
+			log.Error(errMsg)
+			return nil, errors.New(errMsg)
+		}
+	}
 	if in.SnapshotId != "" {
 		snap, err := db.C.GetVolumeSnapshot(ctx, in.SnapshotId)
 		if err != nil {
@@ -69,7 +78,7 @@ func CreateVolumeDBEntry(ctx *c.Context, in *model.VolumeSpec) (*model.VolumeSpe
 
 	in.UserId = ctx.UserId
 	in.Status = model.VolumeCreating
-	in.Description = "Volume is Creating"
+	in.Description = ""
 	// Store the volume data into database.
 	return db.C.CreateVolume(ctx, in)
 }
