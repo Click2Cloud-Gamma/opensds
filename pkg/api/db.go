@@ -78,7 +78,7 @@ func CreateVolumeDBEntry(ctx *c.Context, in *model.VolumeSpec) (*model.VolumeSpe
 
 	in.UserId = ctx.UserId
 	in.Status = model.VolumeCreating
-	in.Description = ""
+	//in.Description = ""
 	// Store the volume data into database.
 	return db.C.CreateVolume(ctx, in)
 }
