@@ -2042,6 +2042,7 @@ type DeleteVolumeGroupOpts struct {
 	// The uuid of the volume group, optional when deleting.
 	Id string `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
 	// The description of the volume, optional.
+
 	Description string `protobuf:"bytes,4,opt,name=description" json:"description,omitempty"`
 	// The pool belongs to the group.
 	PoolId string `protobuf:"bytes,2,opt,name=poolId" json:"poolId,omitempty"`
