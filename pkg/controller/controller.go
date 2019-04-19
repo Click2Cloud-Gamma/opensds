@@ -104,6 +104,7 @@ func (c *Controller) CreateVolume(contx context.Context, opt *pb.CreateVolumeOpt
 		prf, err = db.C.GetProfile(ctx, opt.ProfileId)
 	}
 	if err != nil {
+		opt.Description = "get profile failed: " + err.Error()
 		db.UpdateVolumeStatus(ctx, db.C, opt.Id, model.VolumeError, opt.Description)
 		log.Error("get profile failed: ", err)
 		return pb.GenericResponseError(err), err
@@ -111,12 +112,14 @@ func (c *Controller) CreateVolume(contx context.Context, opt *pb.CreateVolumeOpt
 	if opt.SnapshotId != "" {
 		snap, err = db.C.GetVolumeSnapshot(ctx, opt.SnapshotId)
 		if err != nil {
+			opt.Description = "get snapshot failed in create volume method: " + err.Error()
 			db.UpdateVolumeStatus(ctx, db.C, opt.Id, model.VolumeError, opt.Description)
 			log.Error("get snapshot failed in create volume method: ", err)
 			return pb.GenericResponseError(err), err
 		}
 		snapVol, err = db.C.GetVolume(ctx, snap.VolumeId)
 		if err != nil {
+			opt.Description = "get volume failed in create volume method: " + err.Error()
 			db.UpdateVolumeStatus(ctx, db.C, opt.Id, model.VolumeError, opt.Description)
 			log.Error("get volume failed in create volume method: ", err)
 			return pb.GenericResponseError(err), err
@@ -131,19 +134,16 @@ func (c *Controller) CreateVolume(contx context.Context, opt *pb.CreateVolumeOpt
 	// is updated.
 	vol, err := db.C.GetVolume(ctx, opt.Id)
 	if err != nil {
+		opt.Description = err.Error()
 		db.UpdateVolumeStatus(ctx, db.C, opt.Id, model.VolumeError, opt.Description)
 		return pb.GenericResponseError(err), err
 	}
 	polInfo, err := c.selector.SelectSupportedPoolForVolume(vol)
 	if err != nil {
-		opt.Description = "requested size exceeded the pool size"
+		opt.Description = err.Error()
 		db.UpdateVolumeStatus(ctx, db.C, opt.Id, model.VolumeError, opt.Description)
 
-		_, err := db.C.UpdateVolume(ctx, snapVol)
-		if err != nil {
-			return nil, err
-		}
-		log.Error("********Description**********", opt.Description)
+		log.Error("SelectSupportedPoolForVolume Error", opt.Description)
 		return pb.GenericResponseError(err), err
 	}
 	// whether specify a pool or not, opt's poolid and pool name should be
@@ -153,9 +153,10 @@ func (c *Controller) CreateVolume(contx context.Context, opt *pb.CreateVolumeOpt
 
 	dockInfo, err := db.C.GetDock(ctx, polInfo.DockId)
 	if err != nil {
+		opt.Description = err.Error()
 		db.UpdateVolumeStatus(ctx, db.C, opt.Id, model.VolumeError, opt.Description)
 
-		log.Error("********Description**********", opt.Description)
+		log.Error("GetDock Description ", opt.Description)
 		log.Error("when search supported dock resource:", err.Error())
 		return pb.GenericResponseError(err), err
 	}
@@ -164,6 +165,7 @@ func (c *Controller) CreateVolume(contx context.Context, opt *pb.CreateVolumeOpt
 
 	result, err := c.volumeController.CreateVolume(opt)
 	if err != nil {
+		opt.Description = err.Error()
 		// Change the status of the volume to error when the creation faild
 		defer db.UpdateVolumeStatus(ctx, db.C, opt.Id, model.VolumeError, opt.Description)
 
@@ -176,7 +178,7 @@ func (c *Controller) CreateVolume(contx context.Context, opt *pb.CreateVolumeOpt
 	// Update the volume data in database.
 	db.C.UpdateStatus(ctx, result, model.VolumeAvailable, opt.Description)
 
-	log.Error("********Description**********", opt.Description)
+	//log.Error("********Description**********", opt.Description)
 	// Select the storage tag according to the lifecycle flag.
 	c.policyController = policy.NewController(prf)
 	c.policyController.Setup(CREATE_LIFECIRCLE_FLAG)
