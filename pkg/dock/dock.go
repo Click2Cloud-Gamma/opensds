@@ -115,11 +115,13 @@ func (ds *dockServer) CreateVolume(ctx context.Context, opt *pb.CreateVolumeOpts
 	log.Info("Dock server receive create volume request, vr =", opt)
 
 	vol, err := ds.Driver.CreateVolume(opt)
+	log.Info("check-12")
 	if err != nil {
 		log.Error("when create volume in dock module:", err)
 		return pb.GenericResponseError(err), err
 	}
 	// TODO: maybe need to update status in DB.
+	log.Info("Volume Create ho gaya")
 	return pb.GenericResponseResult(vol), nil
 }
 

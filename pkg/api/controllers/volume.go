@@ -27,8 +27,8 @@ import (
 	"github.com/opensds/opensds/pkg/api/policy"
 	"github.com/opensds/opensds/pkg/api/util"
 	c "github.com/opensds/opensds/pkg/context"
-	"github.com/opensds/opensds/pkg/controller/client"
 	"github.com/opensds/opensds/pkg/db"
+	"github.com/opensds/opensds/pkg/dock/client"
 	"github.com/opensds/opensds/pkg/model"
 	pb "github.com/opensds/opensds/pkg/model/proto"
 	. "github.com/opensds/opensds/pkg/utils/config"
@@ -43,7 +43,7 @@ func NewVolumePortal() *VolumePortal {
 
 type VolumePortal struct {
 	BasePortal
-
+	DockInfo  *model.DockSpec
 	CtrClient client.Client
 }
 
@@ -96,11 +96,16 @@ func (v *VolumePortal) CreateVolume() {
 	// NOTE:The real volume creation process.
 	// Volume creation request is sent to the Dock. Dock will update volume status to "available"
 	// after volume creation is completed.
-	if err := v.CtrClient.Connect(CONF.OsdsLet.ApiEndpoint); err != nil {
-		log.Error("when connecting controller client:", err)
+	//if err := v.CtrClient.Connect(CONF.OsdsLet.ApiEndpoint); err != nil {
+	//	log.Error("when connecting controller client:", err)
+	//	return
+	//}
+	if err := v.CtrClient.Connect(v.DockInfo.Endpoint); err != nil {
+		log.Error("when connecting dock client:", err)
 		return
 	}
 	defer v.CtrClient.Close()
+	log.Info("check-1")
 
 	opt := &pb.CreateVolumeOpts{
 		Id:               result.Id,
@@ -117,9 +122,17 @@ func (v *VolumePortal) CreateVolume() {
 		SnapshotFromCloud: result.SnapshotFromCloud,
 		Context:           ctx.ToJson(),
 	}
-	if _, err = v.CtrClient.CreateVolume(context.Background(), opt); err != nil {
+
+	response, err := v.CtrClient.CreateVolume(context.Background(), opt)
+	log.Info("check-2")
+	if err != nil {
 		log.Error("create volume failed in controller service:", err)
 		return
+	}
+	if errorMsg := response.GetError(); errorMsg != nil {
+		return
+		fmt.Errorf("failed to create volume in volume controller, code: %v, message: %v",
+			errorMsg.GetCode(), errorMsg.GetDescription())
 	}
 
 	return
