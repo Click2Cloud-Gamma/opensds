@@ -134,7 +134,7 @@ func (v *VolumePortal) CreateVolume() {
 		log.Error("when connecting dock client:", err)
 		return
 	}
-	//defer v.CtrClient.Close()
+	defer v.CtrClient.Close()
 	log.Info("check-1")
 
 	opt := &pb.CreateVolumeOpts{
