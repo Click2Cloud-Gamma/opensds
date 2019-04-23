@@ -80,25 +80,23 @@ func (v *VolumePortal) CreateVolume() {
 	}
 
 	//Enter PoolID and snapshot ID
-	if volume.SnapshotId != "" {
-		snap, err := db.C.GetVolumeSnapshot(ctx, volume.SnapshotId)
-		if err != nil {
-			db.UpdateVolumeStatus(ctx, db.C, volume.Id, model.VolumeError)
-			log.Error("get snapshot failed in create volume method: ", err)
-			return
-		}
-		snapVol, err := db.C.GetVolume(ctx, snap.VolumeId)
-		if err != nil {
-			db.UpdateVolumeStatus(ctx, db.C, volume.Id, model.VolumeError)
-			log.Error("get volume failed in create volume method: ", err)
-			return
-		}
-		volume.Size = snapVol.Size
-		log.Info("size:", volume.Size)
-		volume.PoolId = snapVol.PoolId
-		log.Info("pool id:", volume.PoolId)
-		volume.Metadata = utils.MergeStringMaps(volume.Metadata, snap.Metadata)
+	snap, err := db.C.GetVolumeSnapshot(ctx, volume.SnapshotId)
+	if err != nil {
+		db.UpdateVolumeStatus(ctx, db.C, volume.Id, model.VolumeError)
+		log.Error("get snapshot failed in create volume method: ", err)
+		return
 	}
+	snapVol, err := db.C.GetVolume(ctx, snap.VolumeId)
+	if err != nil {
+		db.UpdateVolumeStatus(ctx, db.C, volume.Id, model.VolumeError)
+		log.Error("get volume failed in create volume method: ", err)
+		return
+	}
+	volume.Size = snapVol.Size
+	log.Info("size:", volume.Size)
+	volume.PoolId = snapVol.PoolId
+	log.Info("pool id:", volume.PoolId)
+	volume.Metadata = utils.MergeStringMaps(volume.Metadata, snap.Metadata)
 
 	// NOTE:It will create a volume entry into the database and initialize its status
 	// as "creating". It will not wait for the real volume creation to complete
