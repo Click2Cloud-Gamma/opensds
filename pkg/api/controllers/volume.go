@@ -106,6 +106,7 @@ func (v *VolumePortal) CreateVolume() {
 	// as "creating". It will not wait for the real volume creation to complete
 	// and will return result immediately.
 	log.Info("volume:", volume)
+	volume.PoolId = pools[0].Id
 	log.Info("pool id:", pools[0].Id)
 	result, err := util.CreateVolumeDBEntry(ctx, &volume)
 	log.Info("result:", result)
