@@ -94,7 +94,9 @@ func (v *VolumePortal) CreateVolume() {
 			return
 		}
 		volume.Size = snapVol.Size
+		log.Info("size:", volume.Size)
 		volume.PoolId = snapVol.PoolId
+		log.Info("pool id:", volume.PoolId)
 		volume.Metadata = utils.MergeStringMaps(volume.Metadata, snap.Metadata)
 	}
 
