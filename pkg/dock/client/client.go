@@ -47,6 +47,7 @@ func NewClient() Client { return &client{} }
 func (c *client) Connect(edp string) error {
 	// Set up a connection to the Dock server.
 	conn, err := grpc.Dial(edp, grpc.WithInsecure())
+	log.Info("Check: Connect to Dock client")
 	if err != nil {
 		log.Errorf("did not connect: %+v\n", err)
 		return err
@@ -55,7 +56,7 @@ func (c *client) Connect(edp string) error {
 	c.ProvisionDockClient = pb.NewProvisionDockClient(conn)
 	c.AttachDockClient = pb.NewAttachDockClient(conn)
 	c.ClientConn = conn
-
+	log.Info("Check: Connect to Dock client complete")
 	return nil
 }
 

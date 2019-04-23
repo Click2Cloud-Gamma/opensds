@@ -22,7 +22,6 @@ package controllers
 import (
 	"encoding/json"
 	"fmt"
-
 	log "github.com/golang/glog"
 	"github.com/opensds/opensds/pkg/api/policy"
 	"github.com/opensds/opensds/pkg/api/util"
@@ -31,6 +30,7 @@ import (
 	"github.com/opensds/opensds/pkg/dock/client"
 	"github.com/opensds/opensds/pkg/model"
 	pb "github.com/opensds/opensds/pkg/model/proto"
+	"github.com/opensds/opensds/pkg/utils"
 	. "github.com/opensds/opensds/pkg/utils/config"
 	"golang.org/x/net/context"
 )
@@ -79,6 +79,25 @@ func (v *VolumePortal) CreateVolume() {
 		return
 	}
 
+	//Enter PoolID and snapshot ID
+	if volume.SnapshotId != "" {
+		snap, err := db.C.GetVolumeSnapshot(ctx, volume.SnapshotId)
+		if err != nil {
+			db.UpdateVolumeStatus(ctx, db.C, volume.Id, model.VolumeError)
+			log.Error("get snapshot failed in create volume method: ", err)
+			return
+		}
+		snapVol, err := db.C.GetVolume(ctx, snap.VolumeId)
+		if err != nil {
+			db.UpdateVolumeStatus(ctx, db.C, volume.Id, model.VolumeError)
+			log.Error("get volume failed in create volume method: ", err)
+			return
+		}
+		volume.Size = snapVol.Size
+		volume.PoolId = snapVol.PoolId
+		volume.Metadata = utils.MergeStringMaps(volume.Metadata, snap.Metadata)
+	}
+
 	// NOTE:It will create a volume entry into the database and initialize its status
 	// as "creating". It will not wait for the real volume creation to complete
 	// and will return result immediately.
@@ -100,6 +119,7 @@ func (v *VolumePortal) CreateVolume() {
 	//	log.Error("when connecting controller client:", err)
 	//	return
 	//}
+
 	if err := v.CtrClient.Connect(v.DockInfo.Endpoint); err != nil {
 		log.Error("when connecting dock client:", err)
 		return
@@ -122,9 +142,9 @@ func (v *VolumePortal) CreateVolume() {
 		SnapshotFromCloud: result.SnapshotFromCloud,
 		Context:           ctx.ToJson(),
 	}
-
-	response, err := v.CtrClient.CreateVolume(context.Background(), opt)
 	log.Info("check-2")
+	response, err := v.CtrClient.CreateVolume(context.Background(), opt)
+	log.Info("check-33")
 	if err != nil {
 		log.Error("create volume failed in controller service:", err)
 		return
