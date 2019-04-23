@@ -128,9 +128,9 @@ func (v *VolumePortal) CreateVolume() {
 	//	log.Error("when connecting controller client:", err)
 	//	return
 	//}
-	v.DockInfo.Endpoint = "192.168.1.234"
+	v.DockInfo.Endpoint = "192.168.1.234:50050"
 	log.Info(v.DockInfo.Endpoint)
-	if err := v.CtrClient.Connect(v.DockInfo.Endpoint); err != nil {
+	if err := v.CtrClient.Connect("192.168.1.234:50050"); err != nil {
 		log.Error("when connecting dock client:", err)
 		return
 	}
