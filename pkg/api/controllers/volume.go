@@ -93,15 +93,15 @@ func (v *VolumePortal) CreateVolume() {
 		return
 	}
 	volume.Size = snapVol.Size
-	log.Info("size:", volume.Size)
 	volume.PoolId = snapVol.PoolId
-	log.Info("pool id:", volume.PoolId)
+
 	volume.Metadata = utils.MergeStringMaps(volume.Metadata, snap.Metadata)
 
 	// NOTE:It will create a volume entry into the database and initialize its status
 	// as "creating". It will not wait for the real volume creation to complete
 	// and will return result immediately.
 	log.Info("volume:", volume)
+	log.Info("pool id:", volume.PoolId)
 	result, err := util.CreateVolumeDBEntry(ctx, &volume)
 	log.Info("result:", result)
 	if err != nil {
