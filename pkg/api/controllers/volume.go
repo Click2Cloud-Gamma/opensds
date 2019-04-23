@@ -107,6 +107,14 @@ func (v *VolumePortal) CreateVolume() {
 	// and will return result immediately.
 	log.Info("volume:", volume)
 	volume.PoolId = pools[0].Id
+
+	dockInfo, err := db.C.GetDock(ctx, pools[0].DockId)
+	if err != nil {
+		db.UpdateVolumeStatus(ctx, db.C, volume.Id, model.VolumeError)
+		log.Error("when search supported dock resource:", err.Error())
+		return
+	}
+	log.Info("dock driver:,", dockInfo.DriverName)
 	log.Info("pool id:", pools[0].Id)
 	result, err := util.CreateVolumeDBEntry(ctx, &volume)
 	log.Info("result:", result)
@@ -153,6 +161,8 @@ func (v *VolumePortal) CreateVolume() {
 		SnapshotFromCloud: result.SnapshotFromCloud,
 		Context:           ctx.ToJson(),
 	}
+	opt.DriverName = dockInfo.DriverName
+	opt.PoolName = pools[0].Name
 	log.Info("check-2")
 	response, err := v.CtrClient.CreateVolume(context.Background(), opt)
 	log.Info("check-33")
