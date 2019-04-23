@@ -116,9 +116,11 @@ func (v *VolumePortal) CreateVolume() {
 	}
 
 	// Marshal the result.
+	log.Info("marshel started-RW")
 	body, _ := json.Marshal(result)
+	log.Info("Marshal done-RW")
 	v.SuccessHandle(StatusAccepted, body)
-
+	log.Info("Status Accepted- RW")
 	// NOTE:The real volume creation process.
 	// Volume creation request is sent to the Dock. Dock will update volume status to "available"
 	// after volume creation is completed.
