@@ -20,30 +20,34 @@ This module implements a entry into the OpenSDS northbound service.
 package controllers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+
 	log "github.com/golang/glog"
 	"github.com/opensds/opensds/pkg/api/policy"
 	"github.com/opensds/opensds/pkg/api/util"
 	c "github.com/opensds/opensds/pkg/context"
+	"github.com/opensds/opensds/pkg/controller/client"
 	"github.com/opensds/opensds/pkg/db"
-	"github.com/opensds/opensds/pkg/dock/client"
+	DckClient "github.com/opensds/opensds/pkg/dock/client"
 	"github.com/opensds/opensds/pkg/model"
 	pb "github.com/opensds/opensds/pkg/model/proto"
 	. "github.com/opensds/opensds/pkg/utils/config"
-	"golang.org/x/net/context"
 )
 
 func NewVolumePortal() *VolumePortal {
 	return &VolumePortal{
-		CtrClient: client.NewClient(),
+		CtrClient:  client.NewClient(),
+		DockClient: DckClient.NewClient(),
 	}
 }
 
 type VolumePortal struct {
 	BasePortal
-	DockInfo  *model.DockSpec
-	CtrClient client.Client
+	DockInfo   *model.DockSpec
+	CtrClient  client.Client
+	DockClient DckClient.Client
 }
 
 func (v *VolumePortal) CreateVolume() {
@@ -78,46 +82,10 @@ func (v *VolumePortal) CreateVolume() {
 		return
 	}
 
-	//Enter PoolID and snapshot ID
-	//snap, err := db.C.GetVolumeSnapshot(ctx, volume.SnapshotId)
-	//if err != nil {
-	//	db.UpdateVolumeStatus(ctx, db.C, volume.Id, model.VolumeError)
-	//	log.Error("get snapshot failed in create volume method: ", err)
-	//	return
-	//}
-	//snapVol, err := db.C.GetVolume(ctx, snap.VolumeId)
-	//if err != nil {
-	//	db.UpdateVolumeStatus(ctx, db.C, volume.Id, model.VolumeError)
-	//	log.Error("get volume failed in create volume method: ", err)
-	//	return
-	//}
-	//volume.PoolId = snapVol.PoolId
-
-	//volume.Metadata = utils.MergeStringMaps(volume.Metadata, snap.Metadata)
-	pools, err := db.C.ListPools(c.NewAdminContext())
-	if err != nil {
-		log.Error("When list pools in resources SelectSupportedPool: ", err)
-		return
-	}
-	log.Info("pools", pools)
-	//
-	//dockInfo, err := db.C.GetDock(ctx, .DockId)
 	// NOTE:It will create a volume entry into the database and initialize its status
 	// as "creating". It will not wait for the real volume creation to complete
 	// and will return result immediately.
-	log.Info("volume:", volume)
-	volume.PoolId = pools[0].Id
-
-	dockInfo, err := db.C.GetDock(ctx, pools[0].DockId)
-	if err != nil {
-		db.UpdateVolumeStatus(ctx, db.C, volume.Id, model.VolumeError)
-		log.Error("when search supported dock resource:", err.Error())
-		return
-	}
-	log.Info("dock driver:,", dockInfo.DriverName)
-	log.Info("pool id:", pools[0].Id)
 	result, err := util.CreateVolumeDBEntry(ctx, &volume)
-	log.Info("result:", result)
 	if err != nil {
 		errMsg := fmt.Sprintf("create volume failed: %s", err.Error())
 		v.ErrorHandle(model.ErrorBadRequest, errMsg)
@@ -125,27 +93,39 @@ func (v *VolumePortal) CreateVolume() {
 	}
 
 	// Marshal the result.
-	log.Info("marshel started-RW")
 	body, _ := json.Marshal(result)
-	log.Info("Marshal done-RW")
 	v.SuccessHandle(StatusAccepted, body)
-	log.Info("Status Accepted- RW")
+
+	var pools []*model.StoragePoolSpec
+	var dockInfo *model.DockSpec
 	// NOTE:The real volume creation process.
 	// Volume creation request is sent to the Dock. Dock will update volume status to "available"
 	// after volume creation is completed.
-	//if err := v.CtrClient.Connect(CONF.OsdsLet.ApiEndpoint); err != nil {
-	//	log.Error("when connecting controller client:", err)
-	//	return
-	//}
-	//v.DockInfo.Endpoint = "192.168.1.234:50050"
-	log.Info("192..168")
-	log.Info("install_typr:", CONF.OsdsApiServer.Install_type)
-	if err := v.CtrClient.Connect(dockInfo.Endpoint); err != nil {
-		log.Error("when connecting dock client:", err)
-		return
+	if CONF.OsdsApiServer.Install_type != "thin" {
+		if err := v.CtrClient.Connect(CONF.OsdsLet.ApiEndpoint); err != nil {
+			log.Error("when connecting controller client:", err)
+			return
+		}
+	} else {
+		pools, err = db.C.ListPools(c.NewAdminContext())
+		if err != nil {
+			log.Error("when selecting pools for thin-opensds: ", err)
+			return
+		}
+		dockInfo, err = db.C.GetDock(ctx, pools[0].DockId)
+		if err != nil {
+			db.UpdateVolumeStatus(ctx, db.C, volume.Id, model.VolumeError)
+			log.Error("when search supported dock resource:", err.Error())
+			return
+		}
+		if err := v.DockClient.Connect(dockInfo.Endpoint); err != nil {
+			log.Error("when connecting dock client:", err)
+			return
+		}
 	}
+
 	defer v.CtrClient.Close()
-	log.Info("check-1")
+	defer v.DockClient.Close()
 
 	opt := &pb.CreateVolumeOpts{
 		Id:               result.Id,
@@ -162,22 +142,20 @@ func (v *VolumePortal) CreateVolume() {
 		SnapshotFromCloud: result.SnapshotFromCloud,
 		Context:           ctx.ToJson(),
 	}
-	opt.DriverName = dockInfo.DriverName
-	opt.PoolName = pools[0].Name
-	log.Info("check-2")
-	response, err := v.CtrClient.CreateVolume(context.Background(), opt)
-	log.Info("check-33")
-	if err != nil {
-		log.Error("create volume failed in controller service:", err)
-		return
+	if CONF.OsdsApiServer.Install_type != "thin" {
+		if _, err = v.CtrClient.CreateVolume(context.Background(), opt); err != nil {
+			log.Error("create volume failed in controller service:", err)
+			return
+		}
+	} else {
+		opt.DriverName = dockInfo.DriverName
+		opt.PoolName = pools[0].Name
+		opt.PoolId = pools[0].Id
+		if _, err = v.DockClient.CreateVolume(context.Background(), opt); err != nil {
+			log.Error("create volume failed in controller service:", err)
+			return
+		}
 	}
-	if errorMsg := response.GetError(); errorMsg != nil {
-		return
-		fmt.Errorf("failed to create volume in volume controller, code: %v, message: %v",
-			errorMsg.GetCode(), errorMsg.GetDescription())
-	}
-
-	return
 }
 
 func (v *VolumePortal) ListVolumes() {
@@ -191,14 +169,12 @@ func (v *VolumePortal) ListVolumes() {
 		v.ErrorHandle(model.ErrorBadRequest, errMsg)
 		return
 	}
-
 	result, err := db.C.ListVolumesWithFilter(c.GetContext(v.Ctx), m)
 	if err != nil {
 		errMsg := fmt.Sprintf("list volumes failed: %s", err.Error())
 		v.ErrorHandle(model.ErrorInternalServer, errMsg)
 		return
 	}
-
 	// Marshal the result.
 	body, _ := json.Marshal(result)
 	v.SuccessHandle(StatusOK, body)
