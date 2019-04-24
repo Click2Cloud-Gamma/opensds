@@ -82,6 +82,17 @@ func (v *VolumePortal) CreateVolume() {
 		return
 	}
 
+	var pools []*model.StoragePoolSpec
+	var dockInfo *model.DockSpec
+	if CONF.OsdsApiServer.Install_type == "thin" {
+		pools, err = db.C.ListPools(c.NewAdminContext())
+		if err != nil {
+			log.Error("when selecting pools for thin-opensds: ", err)
+			return
+		}
+		volume.PoolId = pools[0].Id
+
+	}
 	// NOTE:It will create a volume entry into the database and initialize its status
 	// as "creating". It will not wait for the real volume creation to complete
 	// and will return result immediately.
@@ -96,8 +107,6 @@ func (v *VolumePortal) CreateVolume() {
 	body, _ := json.Marshal(result)
 	v.SuccessHandle(StatusAccepted, body)
 
-	var pools []*model.StoragePoolSpec
-	var dockInfo *model.DockSpec
 	// NOTE:The real volume creation process.
 	// Volume creation request is sent to the Dock. Dock will update volume status to "available"
 	// after volume creation is completed.
@@ -112,6 +121,7 @@ func (v *VolumePortal) CreateVolume() {
 			log.Error("when selecting pools for thin-opensds: ", err)
 			return
 		}
+		volume.PoolId = pools[0].Id
 		dockInfo, err = db.C.GetDock(ctx, pools[0].DockId)
 		if err != nil {
 			db.UpdateVolumeStatus(ctx, db.C, volume.Id, model.VolumeError)
@@ -150,11 +160,13 @@ func (v *VolumePortal) CreateVolume() {
 	} else {
 		opt.DriverName = dockInfo.DriverName
 		opt.PoolName = pools[0].Name
-		opt.PoolId = pools[0].Id
-		if _, err = v.DockClient.CreateVolume(context.Background(), opt); err != nil {
+
+		if _, err := v.DockClient.CreateVolume(context.Background(), opt); err != nil {
 			log.Error("create volume failed in controller service:", err)
 			return
 		}
+		db.UpdateVolumeStatus(ctx, db.C, opt.Id, model.VolumeAvailable)
+		return
 	}
 }
 
