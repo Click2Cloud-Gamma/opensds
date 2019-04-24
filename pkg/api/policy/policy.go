@@ -195,7 +195,10 @@ func Authorize(httpCtx *bctx.Context, action string) bool {
 	target := map[string]string{
 		"tenant_id": TenantId,
 	}
-
+	log.Info("a", action)
+	log.Info("t", target)
+	log.Info("c", credentials)
+	log.Info("tenent:", TenantId)
 	log.V(8).Infof("Action: %v", action)
 	log.V(8).Infof("Target: %v", target)
 	log.V(8).Infof("Credentials: %v", credentials)
