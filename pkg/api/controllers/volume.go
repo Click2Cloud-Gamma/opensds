@@ -139,6 +139,7 @@ func (v *VolumePortal) CreateVolume() {
 	//}
 	//v.DockInfo.Endpoint = "192.168.1.234:50050"
 	log.Info("192..168")
+	log.Info("install_typr:", CONF.OsdsApiServer.Install_type)
 	if err := v.CtrClient.Connect(dockInfo.Endpoint); err != nil {
 		log.Error("when connecting dock client:", err)
 		return
