@@ -29,6 +29,7 @@ import (
 	"github.com/opensds/opensds/contrib/connector"
 	"github.com/opensds/opensds/contrib/drivers"
 	c "github.com/opensds/opensds/pkg/context"
+
 	"github.com/opensds/opensds/pkg/db"
 	"github.com/opensds/opensds/pkg/dock/discovery"
 	"github.com/opensds/opensds/pkg/model"
@@ -121,6 +122,8 @@ func (ds *dockServer) CreateVolume(ctx context.Context, opt *pb.CreateVolumeOpts
 	}
 	log.Info("Metadata aa gaya: ", vol.Metadata)
 	// TODO: maybe need to update status in DB.
+	newx := c.NewContextFromJson(opt.GetContext())
+	db.C.UpdateStatus(newx, vol, model.VolumeAvailable)
 	return pb.GenericResponseResult(vol), nil
 }
 
