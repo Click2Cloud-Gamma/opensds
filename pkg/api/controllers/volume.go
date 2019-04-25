@@ -71,6 +71,11 @@ func (v *VolumePortal) CreateVolume() {
 	if volume.ProfileId == "" {
 		log.Warning("Use default profile when user doesn't specify profile.")
 		prf, err = db.C.GetDefaultProfile(ctx)
+		if err != nil {
+			errMsg := fmt.Sprintf("get profile failed: %s", err.Error())
+			v.ErrorHandle(model.ErrorBadRequest, errMsg)
+			return
+		}
 		volume.ProfileId = prf.Id
 	} else {
 		prf, err = db.C.GetProfile(ctx, volume.ProfileId)
@@ -83,11 +88,11 @@ func (v *VolumePortal) CreateVolume() {
 
 	var pools []*model.StoragePoolSpec
 	var dockInfo *model.DockSpec
-	var snap *model.VolumeSnapshotSpec
 	var install = "thin"
 	if install == "thin" {
 		if volume.SnapshotId != "" {
-			snap, err = db.C.GetVolumeSnapshot(ctx, volume.SnapshotId)
+			snap, err := db.C.GetVolumeSnapshot(ctx, volume.SnapshotId)
+			log.Info("Metadat:", snap.Metadata)
 			if err != nil {
 				db.UpdateVolumeStatus(ctx, db.C, volume.Id, model.VolumeError)
 				log.Error("get snapshot failed in create volume method: ", err)
@@ -95,7 +100,7 @@ func (v *VolumePortal) CreateVolume() {
 			}
 		}
 		pools, err = db.C.ListPools(c.NewAdminContext())
-		log.Info("Metadat:", snap.Metadata)
+
 		if err != nil {
 			log.Error("when selecting pools for thin-opensds: ", err)
 			return
