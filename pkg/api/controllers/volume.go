@@ -30,6 +30,7 @@ import (
 	c "github.com/opensds/opensds/pkg/context"
 	"github.com/opensds/opensds/pkg/controller/client"
 	"github.com/opensds/opensds/pkg/db"
+	DckClient "github.com/opensds/opensds/pkg/dock/client"
 	"github.com/opensds/opensds/pkg/model"
 	pb "github.com/opensds/opensds/pkg/model/proto"
 	. "github.com/opensds/opensds/pkg/utils/config"
@@ -37,14 +38,16 @@ import (
 
 func NewVolumePortal() *VolumePortal {
 	return &VolumePortal{
-		CtrClient: client.NewClient(),
+		CtrClient:  client.NewClient(),
+		DockClient: DckClient.NewClient(),
 	}
 }
 
 type VolumePortal struct {
 	BasePortal
-
-	CtrClient client.Client
+	DockInfo   *model.DockSpec
+	CtrClient  client.Client
+	DockClient DckClient.Client
 }
 
 func (v *VolumePortal) CreateVolume() {
@@ -79,6 +82,18 @@ func (v *VolumePortal) CreateVolume() {
 		return
 	}
 
+	var pools []*model.StoragePoolSpec
+	var dockInfo *model.DockSpec
+	var install = "thin"
+	if install == "thin" {
+		pools, err = db.C.ListPools(c.NewAdminContext())
+		if err != nil {
+			log.Error("when selecting pools for thin-opensds: ", err)
+			return
+		}
+		volume.PoolId = pools[0].Id
+
+	}
 	// NOTE:It will create a volume entry into the database and initialize its status
 	// as "creating". It will not wait for the real volume creation to complete
 	// and will return result immediately.
@@ -96,11 +111,33 @@ func (v *VolumePortal) CreateVolume() {
 	// NOTE:The real volume creation process.
 	// Volume creation request is sent to the Dock. Dock will update volume status to "available"
 	// after volume creation is completed.
-	if err := v.CtrClient.Connect(CONF.OsdsLet.ApiEndpoint); err != nil {
-		log.Error("when connecting controller client:", err)
-		return
+
+	if install != "thin" {
+		if err := v.CtrClient.Connect(CONF.OsdsLet.ApiEndpoint); err != nil {
+			log.Error("when connecting controller client:", err)
+			return
+		}
+	} else {
+		pools, err = db.C.ListPools(c.NewAdminContext())
+		if err != nil {
+			log.Error("when selecting pools for thin-opensds: ", err)
+			return
+		}
+		volume.PoolId = pools[0].Id
+		dockInfo, err = db.C.GetDock(ctx, pools[0].DockId)
+		if err != nil {
+			db.UpdateVolumeStatus(ctx, db.C, volume.Id, model.VolumeError)
+			log.Error("when search supported dock resource:", err.Error())
+			return
+		}
+		if err := v.DockClient.Connect(dockInfo.Endpoint); err != nil {
+			log.Error("when connecting dock client:", err)
+			return
+		}
 	}
+
 	defer v.CtrClient.Close()
+	defer v.DockClient.Close()
 
 	opt := &pb.CreateVolumeOpts{
 		Id:               result.Id,
@@ -117,12 +154,22 @@ func (v *VolumePortal) CreateVolume() {
 		SnapshotFromCloud: result.SnapshotFromCloud,
 		Context:           ctx.ToJson(),
 	}
-	if _, err = v.CtrClient.CreateVolume(context.Background(), opt); err != nil {
-		log.Error("create volume failed in controller service:", err)
+	if install != "thin" {
+		if _, err = v.CtrClient.CreateVolume(context.Background(), opt); err != nil {
+			log.Error("create volume failed in controller service:", err)
+			return
+		}
+	} else {
+		opt.DriverName = dockInfo.DriverName
+		opt.PoolName = pools[0].Name
+
+		if _, err := v.DockClient.CreateVolume(context.Background(), opt); err != nil {
+			log.Error("create volume failed in controller service:", err)
+			return
+		}
+		db.UpdateVolumeStatus(ctx, db.C, opt.Id, model.VolumeAvailable)
 		return
 	}
-
-	return
 }
 
 func (v *VolumePortal) ListVolumes() {
@@ -136,14 +183,12 @@ func (v *VolumePortal) ListVolumes() {
 		v.ErrorHandle(model.ErrorBadRequest, errMsg)
 		return
 	}
-
 	result, err := db.C.ListVolumesWithFilter(c.GetContext(v.Ctx), m)
 	if err != nil {
 		errMsg := fmt.Sprintf("list volumes failed: %s", err.Error())
 		v.ErrorHandle(model.ErrorInternalServer, errMsg)
 		return
 	}
-
 	// Marshal the result.
 	body, _ := json.Marshal(result)
 	v.SuccessHandle(StatusOK, body)
