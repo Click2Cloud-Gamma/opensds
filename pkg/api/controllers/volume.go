@@ -88,14 +88,6 @@ func (v *VolumePortal) CreateVolume() {
 	var install = "thin"
 	var snap *model.VolumeSnapshotSpec
 	if install == "thin" {
-		if volume.SnapshotId != "" {
-			snap, err = db.C.GetVolumeSnapshot(ctx, volume.SnapshotId)
-			if err != nil {
-				db.UpdateVolumeStatus(ctx, db.C, volume.Id, model.VolumeError)
-				log.Error("get snapshot failed in create volume method: ", err)
-				return
-			}
-		}
 		pools, err = db.C.ListPools(c.NewAdminContext())
 		if err != nil {
 			log.Error("when selecting pools for thin-opensds: ", err)
@@ -172,6 +164,7 @@ func (v *VolumePortal) CreateVolume() {
 	} else {
 		opt.DriverName = dockInfo.DriverName
 		opt.PoolName = pools[0].Name
+		log.Info("snapid: ", opt.SnapshotId)
 
 		if _, err := v.DockClient.CreateVolume(context.Background(), opt); err != nil {
 			log.Error("create volume failed in controller service:", err)
