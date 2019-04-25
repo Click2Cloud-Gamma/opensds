@@ -119,6 +119,7 @@ func (ds *dockServer) CreateVolume(ctx context.Context, opt *pb.CreateVolumeOpts
 		log.Error("when create volume in dock module:", err)
 		return pb.GenericResponseError(err), err
 	}
+	log.Info("Metadata aa gaya: ", vol.Metadata)
 	// TODO: maybe need to update status in DB.
 	return pb.GenericResponseResult(vol), nil
 }
