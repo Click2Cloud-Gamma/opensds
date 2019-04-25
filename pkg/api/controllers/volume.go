@@ -84,7 +84,8 @@ func (v *VolumePortal) CreateVolume() {
 
 	var pools []*model.StoragePoolSpec
 	var dockInfo *model.DockSpec
-	if CONF.OsdsApiServer.Install_type == "thin" {
+	var install = "thin"
+	if install == "thin" {
 		pools, err = db.C.ListPools(c.NewAdminContext())
 		if err != nil {
 			log.Error("when selecting pools for thin-opensds: ", err)
@@ -110,7 +111,8 @@ func (v *VolumePortal) CreateVolume() {
 	// NOTE:The real volume creation process.
 	// Volume creation request is sent to the Dock. Dock will update volume status to "available"
 	// after volume creation is completed.
-	if CONF.OsdsApiServer.Install_type != "thin" {
+
+	if install != "thin" {
 		if err := v.CtrClient.Connect(CONF.OsdsLet.ApiEndpoint); err != nil {
 			log.Error("when connecting controller client:", err)
 			return
@@ -152,7 +154,7 @@ func (v *VolumePortal) CreateVolume() {
 		SnapshotFromCloud: result.SnapshotFromCloud,
 		Context:           ctx.ToJson(),
 	}
-	if CONF.OsdsApiServer.Install_type != "thin" {
+	if install != "thin" {
 		if _, err = v.CtrClient.CreateVolume(context.Background(), opt); err != nil {
 			log.Error("create volume failed in controller service:", err)
 			return

@@ -27,7 +27,6 @@ type OsdsApiServer struct {
 	HTTPSEnabled       bool          `conf:"https_enabled,false"`
 	BeegoHTTPSCertFile string        `conf:"beego_https_cert_file,/opt/opensds-security/opensds/opensds-cert.pem"`
 	BeegoHTTPSKeyFile  string        `conf:"beego_https_key_file,/opt/opensds-security/opensds/opensds-key.pem"`
-	Install_type       string        `conf:"install_type,full"`
 }
 
 type OsdsLet struct {
