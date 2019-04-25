@@ -23,8 +23,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/opensds/opensds/pkg/utils"
-
 	log "github.com/golang/glog"
 	"github.com/opensds/opensds/pkg/api/policy"
 	"github.com/opensds/opensds/pkg/api/util"
@@ -86,14 +84,12 @@ func (v *VolumePortal) CreateVolume() {
 	var pools []*model.StoragePoolSpec
 	var dockInfo *model.DockSpec
 	var install = "thin"
-	var snap *model.VolumeSnapshotSpec
 	if install == "thin" {
 		pools, err = db.C.ListPools(c.NewAdminContext())
 		if err != nil {
 			log.Error("when selecting pools for thin-opensds: ", err)
 			return
 		}
-		volume.Metadata = utils.MergeStringMaps(volume.Metadata, snap.Metadata)
 		volume.PoolId = pools[0].Id
 	}
 	// NOTE:It will create a volume entry into the database and initialize its status
