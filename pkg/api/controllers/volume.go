@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/opensds/opensds/pkg/utils"
 
 	log "github.com/golang/glog"
 	"github.com/opensds/opensds/pkg/api/policy"
@@ -85,14 +86,23 @@ func (v *VolumePortal) CreateVolume() {
 	var pools []*model.StoragePoolSpec
 	var dockInfo *model.DockSpec
 	var install = "thin"
+	var snap *model.VolumeSnapshotSpec
 	if install == "thin" {
+		if volume.SnapshotId != "" {
+			snap, err = db.C.GetVolumeSnapshot(ctx, volume.SnapshotId)
+			if err != nil {
+				db.UpdateVolumeStatus(ctx, db.C, volume.Id, model.VolumeError)
+				log.Error("get snapshot failed in create volume method: ", err)
+				return
+			}
+		}
 		pools, err = db.C.ListPools(c.NewAdminContext())
 		if err != nil {
 			log.Error("when selecting pools for thin-opensds: ", err)
 			return
 		}
+		volume.Metadata = utils.MergeStringMaps(volume.Metadata, snap.Metadata)
 		volume.PoolId = pools[0].Id
-
 	}
 	// NOTE:It will create a volume entry into the database and initialize its status
 	// as "creating". It will not wait for the real volume creation to complete
