@@ -684,6 +684,20 @@ func (v *VolumeSnapshotPortal) CreateVolumeSnapshot() {
 	var install = "thin"
 
 	if install == "thin" {
+		// Get snapshot profile
+		if result.ProfileId != "" {
+			profile, err := db.C.GetProfile(ctx, result.ProfileId)
+			if err != nil {
+				log.Error("when get profile resource: ", err)
+				db.UpdateVolumeSnapshotStatus(ctx, db.C, result.Id, model.VolumeSnapError)
+				return
+			}
+
+			if profile.SnapshotProperties.Topology.Bucket != "" {
+				result.Metadata["bucket"] = profile.SnapshotProperties.Topology.Bucket
+			}
+		}
+
 		volume, err := db.C.GetVolume(ctx, result.VolumeId)
 		if err != nil {
 			log.Error("create volume snapshot failed in controller service")
