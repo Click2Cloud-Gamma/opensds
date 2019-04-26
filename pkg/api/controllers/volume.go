@@ -291,6 +291,7 @@ func (v *VolumePortal) ExtendVolume() {
 		defer func() {
 			if rollBack {
 				db.UpdateVolumeStatus(ctx, db.C, result.Id, model.VolumeAvailable)
+				log.Info("extend volume failed due to invalid size")
 			}
 		}()
 
