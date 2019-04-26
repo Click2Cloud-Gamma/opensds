@@ -215,7 +215,9 @@ func (d *Driver) DeleteVolume(opt *pb.DeleteVolumeOpts) error {
 
 // ExtendVolume ...
 func (d *Driver) ExtendVolume(opt *pb.ExtendVolumeOpts) (*model.VolumeSpec, error) {
+	log.Info("pahucha")
 	var name = volumePrefix + opt.GetId()
+	log.Info(name)
 	if err := d.cli.ExtendVolume(name, opt.GetPoolName(), opt.GetSize()); err != nil {
 		log.Errorf("extend volume(%s) failed, error: %v", name, err)
 		return nil, err
@@ -558,7 +560,7 @@ func (d *Driver) InitializeSnapshotConnection(opt *pb.CreateSnapshotAttachmentOp
 
 func (d *Driver) TerminateSnapshotConnection(opt *pb.DeleteSnapshotAttachmentOpts) error {
 	accPro := opt.AccessProtocol
-	if accPro == nvmeofAccess{
+	if accPro == nvmeofAccess {
 		log.Infof("nvmet right now can not support snap volume serve as nvme target")
 		log.Infof("still create snapshot connection by iscsi")
 		accPro = iscsiAccess

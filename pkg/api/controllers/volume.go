@@ -278,6 +278,7 @@ func (v *VolumePortal) ExtendVolume() {
 	// Volume extension request is sent to the Dock. Dock will update volume status to "available"
 	// after volume extension is completed.
 	var dockInfo *model.DockSpec
+	var pool *model.StoragePoolSpec
 	var install = "thin"
 	if install != "thin" {
 		if err := v.CtrClient.Connect(CONF.OsdsLet.ApiEndpoint); err != nil {
@@ -294,7 +295,7 @@ func (v *VolumePortal) ExtendVolume() {
 			}
 		}()
 
-		pool, err := db.C.GetPool(ctx, result.PoolId)
+		pool, err = db.C.GetPool(ctx, result.PoolId)
 		if nil != err {
 			log.Error("get pool failed in extend volume method: ", err.Error())
 			rollBack = true
@@ -325,6 +326,7 @@ func (v *VolumePortal) ExtendVolume() {
 		Metadata: result.Metadata,
 		Context:  ctx.ToJson(),
 		PoolId:   result.PoolId,
+		PoolName: pool.Name,
 	}
 	log.Info("opt cross")
 	if install != "thin" {
