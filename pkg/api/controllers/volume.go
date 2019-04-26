@@ -868,17 +868,53 @@ func (v *VolumeSnapshotPortal) DeleteVolumeSnapshot() {
 	// NOTE:The real volume snapshot deletion process.
 	// Volume snapshot deletion request is sent to the Dock. Dock will delete volume snapshot from driver and
 	// database or update its status to "errorDeleting" if volume snapshot deletion from driver failed.
-	if err := v.CtrClient.Connect(CONF.OsdsLet.ApiEndpoint); err != nil {
-		log.Error("when connecting controller client:", err)
-		return
+	var install = "thin"
+	if install != "thin" {
+		if err := v.CtrClient.Connect(CONF.OsdsLet.ApiEndpoint); err != nil {
+			log.Error("when connecting controller client:", err)
+			return
+		}
+	} else {
+		if err := v.DockClient.Connect(CONF.OsdsDock.ApiEndpoint); err != nil {
+			log.Error("when connecting dock client:", err)
+			return
+		}
 	}
 	defer v.CtrClient.Close()
+	defer v.DockClient.Close()
 
 	opt := &pb.DeleteVolumeSnapshotOpts{
 		Id:       snapshot.Id,
 		VolumeId: snapshot.VolumeId,
 		Metadata: snapshot.Metadata,
 		Context:  ctx.ToJson(),
+	}
+
+	if install == "thin" {
+		volume, err := db.C.GetVolume(ctx, opt.VolumeId)
+		if err != nil {
+			log.Error("create volume snapshot failed in controller service")
+			return
+		}
+		dockInfo, err := db.C.GetDockByPoolId(ctx, volume.PoolId)
+		if err != nil {
+			log.Error("when search supported dock resource: ", err)
+			db.UpdateVolumeSnapshotStatus(ctx, db.C, opt.Id, model.VolumeSnapError)
+			return
+		}
+		opt.Metadata = volume.Metadata
+		opt.DriverName = dockInfo.DriverName
+
+		if _, err = v.DockClient.DeleteVolumeSnapshot(context.Background(), opt); err != nil {
+			log.Error("create volume snapshot failed in controller service:", err)
+			return
+		}
+
+	} else {
+		if _, err = v.CtrClient.DeleteVolumeSnapshot(context.Background(), opt); err != nil {
+			log.Error("create volume snapshot failed in controller service:", err)
+			return
+		}
 	}
 	if _, err = v.CtrClient.DeleteVolumeSnapshot(context.Background(), opt); err != nil {
 		log.Error("delete volume snapthot failed in controller service:", err)
