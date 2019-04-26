@@ -698,13 +698,6 @@ func (v *VolumeSnapshotPortal) CreateVolumeSnapshot() {
 			}
 		}
 
-		volume, err := db.C.GetVolume(ctx, result.VolumeId)
-		if err != nil {
-			log.Error("create volume snapshot failed in controller service")
-			return
-		}
-		result.Metadata = volume.Metadata
-		result.Size = volume.Size
 	}
 
 	// Marshal the result.
@@ -741,8 +734,23 @@ func (v *VolumeSnapshotPortal) CreateVolumeSnapshot() {
 	log.Info("opt:", opt)
 
 	if install == "thin" {
+		volume, err := db.C.GetVolume(ctx, result.VolumeId)
+		if err != nil {
+			log.Error("create volume snapshot failed in controller service")
+			return
+		}
+		dockInfo, err := db.C.GetDockByPoolId(ctx, volume.PoolId)
+		if err != nil {
+			log.Error("when search supported dock resource: ", err)
+			db.UpdateVolumeSnapshotStatus(ctx, db.C, result.Id, model.VolumeSnapError)
+			return
+		}
+		opt.Metadata = volume.Metadata
+		opt.Size = volume.Size
+		opt.DriverName = dockInfo.DriverName
 
 		log.Info("volsize", opt.Size)
+
 		if _, err = v.DockClient.CreateVolumeSnapshot(context.Background(), opt); err != nil {
 			log.Error("create volume snapshot failed in controller service:", err)
 			return
