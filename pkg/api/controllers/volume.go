@@ -889,7 +889,7 @@ func (v *VolumeSnapshotPortal) DeleteVolumeSnapshot() {
 		Metadata: snapshot.Metadata,
 		Context:  ctx.ToJson(),
 	}
-
+	log.Info("opt snap ka ", opt)
 	if install == "thin" {
 		volume, err := db.C.GetVolume(ctx, opt.VolumeId)
 		if err != nil {
@@ -902,7 +902,7 @@ func (v *VolumeSnapshotPortal) DeleteVolumeSnapshot() {
 			db.UpdateVolumeSnapshotStatus(ctx, db.C, opt.Id, model.VolumeSnapError)
 			return
 		}
-		opt.Metadata = volume.Metadata
+		//opt.Metadata = volume.Metadata
 		opt.DriverName = dockInfo.DriverName
 
 		if _, err = v.DockClient.DeleteVolumeSnapshot(context.Background(), opt); err != nil {
