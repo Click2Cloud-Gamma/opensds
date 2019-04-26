@@ -86,7 +86,7 @@ func (v *VolumePortal) CreateVolume() {
 	}
 
 	var pools []*model.StoragePoolSpec
-
+	var dockInfo *model.DockSpec
 	var install = "thin"
 	if install == "thin" {
 		pools, err = db.C.ListPools(c.NewAdminContext())
@@ -114,20 +114,14 @@ func (v *VolumePortal) CreateVolume() {
 	// NOTE:The real volume creation process.
 	// Volume creation request is sent to the Dock. Dock will update volume status to "available"
 	// after volume creation is completed.
-	var dockInfo *model.DockSpec
+
 	if install != "thin" {
 		if err := v.CtrClient.Connect(CONF.OsdsLet.ApiEndpoint); err != nil {
 			log.Error("when connecting controller client:", err)
 			return
 		}
 	} else {
-		dockInfo, err = db.C.GetDock(ctx, pools[0].DockId)
-		if err != nil {
-			db.UpdateVolumeStatus(ctx, db.C, volume.Id, model.VolumeError)
-			log.Error("when search supported dock resource:", err.Error())
-			return
-		}
-		if err := v.DockClient.Connect(dockInfo.Endpoint); err != nil {
+		if err := v.DockClient.Connect(CONF.OsdsDock.ApiEndpoint); err != nil {
 			log.Error("when connecting dock client:", err)
 			return
 		}
@@ -158,9 +152,14 @@ func (v *VolumePortal) CreateVolume() {
 			return
 		}
 	} else {
+		dockInfo, err = db.C.GetDock(ctx, pools[0].DockId)
+		if err != nil {
+			db.UpdateVolumeStatus(ctx, db.C, volume.Id, model.VolumeError)
+			log.Error("when search supported dock resource:", err.Error())
+			return
+		}
 		opt.DriverName = dockInfo.DriverName
 		opt.PoolName = pools[0].Name
-		log.Info("snapid: ", opt.SnapshotId)
 
 		if _, err := v.DockClient.CreateVolume(context.Background(), opt); err != nil {
 			log.Error("create volume failed in controller service:", err)
@@ -646,14 +645,15 @@ func (v *VolumeAttachmentPortal) DeleteVolumeAttachment() {
 
 func NewVolumeSnapshotPortal() *VolumeSnapshotPortal {
 	return &VolumeSnapshotPortal{
-		CtrClient: client.NewClient(),
+		CtrClient:  client.NewClient(),
+		DockClient: DckClient.NewClient(),
 	}
 }
 
 type VolumeSnapshotPortal struct {
 	BasePortal
-
-	CtrClient client.Client
+	DockClient DckClient.Client
+	CtrClient  client.Client
 }
 
 func (v *VolumeSnapshotPortal) CreateVolumeSnapshot() {
@@ -688,11 +688,20 @@ func (v *VolumeSnapshotPortal) CreateVolumeSnapshot() {
 	// NOTE:The real volume snapshot creation process.
 	// Volume snapshot creation request is sent to the Dock. Dock will update volume snapshot status to "available"
 	// after volume snapshot creation complete.
-	if err := v.CtrClient.Connect(CONF.OsdsLet.ApiEndpoint); err != nil {
-		log.Error("when connecting controller client:", err)
-		return
+	var install = "thin"
+	if install != "thin" {
+		if err := v.CtrClient.Connect(CONF.OsdsLet.ApiEndpoint); err != nil {
+			log.Error("when connecting controller client:", err)
+			return
+		}
+	} else {
+		if err := v.DockClient.Connect(CONF.OsdsDock.ApiEndpoint); err != nil {
+			log.Error("when connecting dock client:", err)
+			return
+		}
 	}
 	defer v.CtrClient.Close()
+	defer v.DockClient.Close()
 
 	opt := &pb.CreateVolumeSnapshotOpts{
 		Id:          result.Id,
@@ -703,8 +712,9 @@ func (v *VolumeSnapshotPortal) CreateVolumeSnapshot() {
 		Metadata:    result.Metadata,
 		Context:     ctx.ToJson(),
 	}
+	log.Info("opt:", opt)
 	if _, err = v.CtrClient.CreateVolumeSnapshot(context.Background(), opt); err != nil {
-		log.Error("create volume snapthot failed in controller service:", err)
+		log.Error("create volume snapshot failed in controller service:", err)
 		return
 	}
 
