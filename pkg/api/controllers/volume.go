@@ -309,12 +309,13 @@ func (v *VolumePortal) ExtendVolume() {
 			rollBack = true
 			return
 		}
-
+		log.Info("yaha tak pahuch gaya-1", result.PoolId)
 		dockInfo, err = db.C.GetDockByPoolId(ctx, result.PoolId)
 		if err != nil {
 			log.Error("extend volume failed in controller service:", err)
 			return
 		}
+		log.Info("dockinfo", dockInfo)
 		if err := v.DockClient.Connect(dockInfo.Endpoint); err != nil {
 			log.Error("when connecting dock client:", err)
 			return
