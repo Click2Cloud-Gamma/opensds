@@ -156,7 +156,9 @@ func (ds *dockServer) ExtendVolume(ctx context.Context, opt *pb.ExtendVolumeOpts
 		log.Error("when extend volume in dock module:", err)
 		return pb.GenericResponseError(err), err
 	}
-	// TODO: maybe need to update status in DB.
+	//Updating Volume status in DB
+	newx := c.NewContextFromJson(opt.GetContext())
+	db.C.UpdateStatus(newx, vol, model.VolumeAvailable)
 	return pb.GenericResponseResult(vol), nil
 }
 

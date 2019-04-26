@@ -44,7 +44,6 @@ func NewVolumePortal() *VolumePortal {
 
 type VolumePortal struct {
 	BasePortal
-	DockInfo   *model.DockSpec
 	CtrClient  client.Client
 	DockClient DckClient.Client
 }
@@ -87,7 +86,7 @@ func (v *VolumePortal) CreateVolume() {
 	}
 
 	var pools []*model.StoragePoolSpec
-	var dockInfo *model.DockSpec
+
 	var install = "thin"
 	if install == "thin" {
 		pools, err = db.C.ListPools(c.NewAdminContext())
@@ -115,19 +114,13 @@ func (v *VolumePortal) CreateVolume() {
 	// NOTE:The real volume creation process.
 	// Volume creation request is sent to the Dock. Dock will update volume status to "available"
 	// after volume creation is completed.
-
+	var dockInfo *model.DockSpec
 	if install != "thin" {
 		if err := v.CtrClient.Connect(CONF.OsdsLet.ApiEndpoint); err != nil {
 			log.Error("when connecting controller client:", err)
 			return
 		}
 	} else {
-		pools, err = db.C.ListPools(c.NewAdminContext())
-		if err != nil {
-			log.Error("when selecting pools for thin-opensds: ", err)
-			return
-		}
-		volume.PoolId = pools[0].Id
 		dockInfo, err = db.C.GetDock(ctx, pools[0].DockId)
 		if err != nil {
 			db.UpdateVolumeStatus(ctx, db.C, volume.Id, model.VolumeError)
@@ -275,6 +268,7 @@ func (v *VolumePortal) ExtendVolume() {
 		v.ErrorHandle(model.ErrorBadRequest, errMsg)
 		return
 	}
+	log.Info("result:", result)
 
 	// Marshal the result.
 	body, _ := json.Marshal(result)
@@ -283,11 +277,27 @@ func (v *VolumePortal) ExtendVolume() {
 	// NOTE:The real volume extension process.
 	// Volume extension request is sent to the Dock. Dock will update volume status to "available"
 	// after volume extension is completed.
-	if err = v.CtrClient.Connect(CONF.OsdsLet.ApiEndpoint); err != nil {
-		log.Error("when connecting controller client:", err)
-		return
+	var dockInfo *model.DockSpec
+	var install = "thin"
+	if install != "thin" {
+		if err := v.CtrClient.Connect(CONF.OsdsLet.ApiEndpoint); err != nil {
+			log.Error("when connecting controller client:", err)
+			return
+		}
+	} else {
+
+		dockInfo, err = db.C.GetDockByPoolId(ctx, id)
+		if err != nil {
+			log.Error("create volume failed in controller service:", err)
+			return
+		}
+		if err := v.DockClient.Connect(dockInfo.Endpoint); err != nil {
+			log.Error("when connecting dock client:", err)
+			return
+		}
 	}
 	defer v.CtrClient.Close()
+	defer v.DockClient.Close()
 
 	opt := &pb.ExtendVolumeOpts{
 		Id:       id,
@@ -295,11 +305,18 @@ func (v *VolumePortal) ExtendVolume() {
 		Metadata: result.Metadata,
 		Context:  ctx.ToJson(),
 	}
-	if _, err = v.CtrClient.ExtendVolume(context.Background(), opt); err != nil {
-		log.Error("extend volume failed in controller service:", err)
-		return
+	if install != "thin" {
+		if _, err = v.CtrClient.ExtendVolume(context.Background(), opt); err != nil {
+			log.Error("extend volume failed in controller service:", err)
+			return
+		}
+	} else {
+		opt.DriverName = dockInfo.DriverName
+		if _, err := v.DockClient.ExtendVolume(context.Background(), opt); err != nil {
+			log.Error("extend volume failed in controller service:", err)
+			return
+		}
 	}
-
 	return
 }
 
@@ -405,14 +422,16 @@ func (v *VolumePortal) DeleteVolume() {
 
 func NewVolumeAttachmentPortal() *VolumeAttachmentPortal {
 	return &VolumeAttachmentPortal{
-		CtrClient: client.NewClient(),
+		CtrClient:  client.NewClient(),
+		DockClient: DckClient.NewClient(),
 	}
 }
 
 type VolumeAttachmentPortal struct {
 	BasePortal
 
-	CtrClient client.Client
+	CtrClient  client.Client
+	DockClient DckClient.Client
 }
 
 func (v *VolumeAttachmentPortal) CreateVolumeAttachment() {
