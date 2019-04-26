@@ -713,9 +713,25 @@ func (v *VolumeSnapshotPortal) CreateVolumeSnapshot() {
 		Context:     ctx.ToJson(),
 	}
 	log.Info("opt:", opt)
-	if _, err = v.CtrClient.CreateVolumeSnapshot(context.Background(), opt); err != nil {
-		log.Error("create volume snapshot failed in controller service:", err)
-		return
+
+	if install == "thin" {
+		volume, err := db.C.GetVolume(ctx, opt.VolumeId)
+		if err != nil {
+			log.Error("create volume snapshot failed in controller service")
+			return
+		}
+		opt.Metadata = volume.Metadata
+		opt.Size = volume.Size
+		if _, err = v.DockClient.CreateVolumeSnapshot(context.Background(), opt); err != nil {
+			log.Error("create volume snapshot failed in controller service:", err)
+			return
+		}
+
+	} else {
+		if _, err = v.CtrClient.CreateVolumeSnapshot(context.Background(), opt); err != nil {
+			log.Error("create volume snapshot failed in controller service:", err)
+			return
+		}
 	}
 
 	return
