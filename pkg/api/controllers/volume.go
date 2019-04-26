@@ -278,6 +278,7 @@ func (v *VolumePortal) ExtendVolume() {
 	// Volume extension request is sent to the Dock. Dock will update volume status to "available"
 	// after volume extension is completed.
 	var dockInfo *model.DockSpec
+	var pool *model.StoragePoolSpec
 	var install = "thin"
 	if install != "thin" {
 		if err := v.CtrClient.Connect(CONF.OsdsLet.ApiEndpoint); err != nil {
@@ -285,10 +286,32 @@ func (v *VolumePortal) ExtendVolume() {
 			return
 		}
 	} else {
+		// To roll back size and status if
+		var rollBack = false
+		defer func() {
+			if rollBack {
+				db.UpdateVolumeStatus(ctx, db.C, result.Id, model.VolumeAvailable)
+			}
+		}()
 
-		dockInfo, err = db.C.GetDockByPoolId(ctx, id)
+		pool, err := db.C.GetPool(ctx, result.PoolId)
+		if nil != err {
+			log.Error("get pool failed in extend volume method: ", err.Error())
+			rollBack = true
+			return
+		}
+
+		var newSize = extendRequestBody.NewSize
+		if pool.FreeCapacity <= (newSize - result.Size) {
+			fmt.Sprintf("pool free capacity(%d) < new size(%d) - old size(%d)",
+				pool.FreeCapacity, newSize, result.Size)
+			rollBack = true
+			return
+		}
+
+		dockInfo, err = db.C.GetDockByPoolId(ctx, result.PoolId)
 		if err != nil {
-			log.Error("create volume failed in controller service:", err)
+			log.Error("extend volume failed in controller service:", err)
 			return
 		}
 		if err := v.DockClient.Connect(dockInfo.Endpoint); err != nil {
@@ -304,6 +327,8 @@ func (v *VolumePortal) ExtendVolume() {
 		Size:     extendRequestBody.NewSize,
 		Metadata: result.Metadata,
 		Context:  ctx.ToJson(),
+		PoolName: pool.Name,
+		PoolId:   pool.Id,
 	}
 	if install != "thin" {
 		if _, err = v.CtrClient.ExtendVolume(context.Background(), opt); err != nil {
