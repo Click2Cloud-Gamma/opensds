@@ -343,6 +343,7 @@ func (v *VolumePortal) ExtendVolume() {
 			log.Error("extend volume failed in controller service:", err)
 			return
 		}
+		log.Info("dock ko extend request gayi")
 	}
 	return
 }

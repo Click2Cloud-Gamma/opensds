@@ -55,10 +55,11 @@ func (c *client) Connect(edp string) error {
 	c.ProvisionDockClient = pb.NewProvisionDockClient(conn)
 	c.AttachDockClient = pb.NewAttachDockClient(conn)
 	c.ClientConn = conn
-
+	log.Info("Dock se connection ho gaya")
 	return nil
 }
 
 func (c *client) Close() {
+	log.Info("Client close ho gaya")
 	c.ClientConn.Close()
 }
