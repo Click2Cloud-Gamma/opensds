@@ -463,12 +463,6 @@ func (c *Controller) DeleteVolumeSnapshot(contx context.Context, opt *pb.DeleteV
 		db.UpdateVolumeSnapshotStatus(ctx, db.C, opt.Id, model.VolumeSnapErrorDeleting)
 		return pb.GenericResponseError(err), err
 	}
-	if err = db.C.DeleteVolumeSnapshot(ctx, opt.Id); err != nil {
-		log.Error("error occurred in controller module when delete volume snapshot in db: ", err)
-		db.UpdateVolumeSnapshotStatus(ctx, db.C, opt.Id, model.VolumeSnapErrorDeleting)
-		return pb.GenericResponseError(err), err
-	}
-
 	return pb.GenericResponseResult(nil), nil
 }
 

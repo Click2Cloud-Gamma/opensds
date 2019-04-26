@@ -241,7 +241,13 @@ func (ds *dockServer) DeleteVolumeSnapshot(ctx context.Context, opt *pb.DeleteVo
 		log.Error("error occurred in dock module when delete snapshot:", err)
 		return pb.GenericResponseError(err), err
 	}
-	// TODO: maybe need to update status in DB.
+	//Updating database
+	newctx := c.NewContextFromJson(opt.GetContext())
+	if err2 := db.C.DeleteVolumeSnapshot(newctx, opt.Id); err2 != nil {
+		log.Error("error occurred in controller module when delete volume snapshot in db: ", err2)
+		db.UpdateVolumeSnapshotStatus(newctx, db.C, opt.Id, model.VolumeSnapErrorDeleting)
+		return pb.GenericResponseError(err2), err2
+	}
 	return pb.GenericResponseResult(nil), nil
 }
 
