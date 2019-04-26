@@ -351,6 +351,7 @@ func (v *VolumePortal) DeleteVolume() {
 	// NOTE:The real volume deletion process.
 	// Volume deletion request is sent to the Dock. Dock will delete volume from driver
 	// and database or update volume status to "errorDeleting" if deletion from driver faild.
+	var dockInfo *model.DockSpec
 	var install = "thin"
 	if install != "thin" {
 		if err := v.CtrClient.Connect(CONF.OsdsLet.ApiEndpoint); err != nil {
@@ -358,7 +359,13 @@ func (v *VolumePortal) DeleteVolume() {
 			return
 		}
 	} else {
-		if err := v.DockClient.Connect(CONF.OsdsApiServer.ApiEndpoint); err != nil {
+
+		dockInfo, err = db.C.GetDockByPoolId(ctx, volume.PoolId)
+		if err != nil {
+			log.Error("create volume failed in controller service:", err)
+			return
+		}
+		if err := v.DockClient.Connect(dockInfo.Endpoint); err != nil {
 			log.Error("when connecting dock client:", err)
 			return
 		}
@@ -382,13 +389,9 @@ func (v *VolumePortal) DeleteVolume() {
 			return
 		}
 	} else {
-		var dockInfo *model.DockSpec
-		dockInfo, err = db.C.GetDockByPoolId(ctx, opt.PoolId)
-		if err != nil {
-			log.Error("create volume failed in controller service:", err)
-			return
-		}
+
 		opt.DriverName = dockInfo.DriverName
+
 		if _, err := v.DockClient.DeleteVolume(context.Background(), opt); err != nil {
 			log.Error("create volume failed in controller service:", err)
 			return
