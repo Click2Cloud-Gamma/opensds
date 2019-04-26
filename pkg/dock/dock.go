@@ -223,7 +223,9 @@ func (ds *dockServer) CreateVolumeSnapshot(ctx context.Context, opt *pb.CreateVo
 		log.Error("error occurred in dock module when create snapshot:", err)
 		return pb.GenericResponseError(err), err
 	}
-	// TODO: maybe need to update status in DB.
+	newctx := c.NewContextFromJson(opt.GetContext())
+	db.C.UpdateStatus(newctx, snp, model.VolumeSnapAvailable)
+	log.Info("Snapshot Created Successfully")
 	return pb.GenericResponseResult(snp), nil
 }
 
