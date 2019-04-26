@@ -376,13 +376,13 @@ func (v *VolumePortal) DeleteVolume() {
 	}
 
 	if install != "thin" {
-		if _, err = v.CtrClient.CreateVolume(context.Background(), opt); err != nil {
+		if _, err = v.CtrClient.DeleteVolume(context.Background(), opt); err != nil {
 			log.Error("create volume failed in controller service:", err)
 			return
 		}
 		return
 	} else {
-		if _, err := v.DockClient.CreateVolume(context.Background(), opt); err != nil {
+		if _, err := v.DockClient.DeleteVolume(context.Background(), opt); err != nil {
 			log.Error("create volume failed in controller service:", err)
 			return
 		}
