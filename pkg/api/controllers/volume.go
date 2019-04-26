@@ -158,6 +158,7 @@ func (v *VolumePortal) CreateVolume() {
 		SnapshotFromCloud: result.SnapshotFromCloud,
 		Context:           ctx.ToJson(),
 	}
+
 	if install != "thin" {
 		if _, err = v.CtrClient.CreateVolume(context.Background(), opt); err != nil {
 			log.Error("create volume failed in controller service:", err)
@@ -380,14 +381,23 @@ func (v *VolumePortal) DeleteVolume() {
 			log.Error("create volume failed in controller service:", err)
 			return
 		}
-		return
 	} else {
+		var dockInfo *model.DockSpec
+		dockInfo, err = db.C.GetDockByPoolId(ctx, opt.PoolId)
+		if err != nil {
+			log.Error("create volume failed in controller service:", err)
+			return
+		}
+		opt.DriverName = dockInfo.DriverName
 		if _, err := v.DockClient.DeleteVolume(context.Background(), opt); err != nil {
 			log.Error("create volume failed in controller service:", err)
 			return
 		}
-		return
+		if err = db.C.DeleteVolume(ctx, opt.GetId()); err != nil {
+			return
+		}
 	}
+	return
 }
 
 func NewVolumeAttachmentPortal() *VolumeAttachmentPortal {

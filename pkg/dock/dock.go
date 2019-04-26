@@ -121,7 +121,7 @@ func (ds *dockServer) CreateVolume(ctx context.Context, opt *pb.CreateVolumeOpts
 		return pb.GenericResponseError(err), err
 	}
 	log.Info("Metadata aa gaya: ", vol.Metadata)
-	// TODO: maybe need to update status in DB.
+	//Updating Volume status in DB
 	newx := c.NewContextFromJson(opt.GetContext())
 	db.C.UpdateStatus(newx, vol, model.VolumeAvailable)
 	return pb.GenericResponseResult(vol), nil
