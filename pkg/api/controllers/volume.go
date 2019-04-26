@@ -324,20 +324,21 @@ func (v *VolumePortal) ExtendVolume() {
 	defer v.CtrClient.Close()
 	defer v.DockClient.Close()
 	log.Info("check-1")
+
 	opt := &pb.ExtendVolumeOpts{
 		Id:       id,
 		Size:     extendRequestBody.NewSize,
 		Metadata: result.Metadata,
 		Context:  ctx.ToJson(),
-		PoolName: pool.Name,
-		PoolId:   pool.Id,
 	}
+	log.Info("opt cross")
 	if install != "thin" {
 		if _, err = v.CtrClient.ExtendVolume(context.Background(), opt); err != nil {
 			log.Error("extend volume failed in controller service:", err)
 			return
 		}
 	} else {
+		log.Info("j1")
 		opt.PoolId = pool.Id
 		opt.PoolName = pool.Name
 		opt.DriverName = dockInfo.DriverName
