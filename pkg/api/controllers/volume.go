@@ -268,7 +268,6 @@ func (v *VolumePortal) ExtendVolume() {
 		v.ErrorHandle(model.ErrorBadRequest, errMsg)
 		return
 	}
-	log.Info("result:", result)
 
 	// Marshal the result.
 	body, _ := json.Marshal(result)
@@ -286,7 +285,7 @@ func (v *VolumePortal) ExtendVolume() {
 			return
 		}
 	} else {
-		// To roll back size and status if
+		// To roll back size and status if INVALID
 		var rollBack = false
 		defer func() {
 			if rollBack {
@@ -309,8 +308,6 @@ func (v *VolumePortal) ExtendVolume() {
 			rollBack = true
 			return
 		}
-		log.Info("yaha tak pahuch gaya-1", result.PoolId)
-
 		if err := v.DockClient.Connect(CONF.OsdsDock.ApiEndpoint); err != nil {
 			log.Error("when connecting dock client:", err)
 			return
@@ -318,7 +315,6 @@ func (v *VolumePortal) ExtendVolume() {
 	}
 	defer v.CtrClient.Close()
 	defer v.DockClient.Close()
-	log.Info("check-1")
 
 	opt := &pb.ExtendVolumeOpts{
 		Id:       id,
@@ -326,9 +322,8 @@ func (v *VolumePortal) ExtendVolume() {
 		Metadata: result.Metadata,
 		Context:  ctx.ToJson(),
 		PoolId:   result.PoolId,
-		PoolName: pool.Name,
 	}
-	log.Info("opt cross")
+
 	if install != "thin" {
 		if _, err = v.CtrClient.ExtendVolume(context.Background(), opt); err != nil {
 			log.Error("extend volume failed in controller service:", err)
@@ -341,16 +336,12 @@ func (v *VolumePortal) ExtendVolume() {
 			log.Error("extend volume failed in controller service:", err)
 			return
 		}
-		log.Info("dockinfo", dockInfo)
-		log.Info("dock", dockInfo)
-		log.Info("Checke 21")
+		opt.PoolName = pool.Name
 		opt.DriverName = dockInfo.DriverName
-		log.Info("opt", opt.DriverName)
 		if _, err := v.DockClient.ExtendVolume(context.Background(), opt); err != nil {
 			log.Error("extend volume failed in controller service:", err)
 			return
 		}
-		log.Info("dock ko extend request gayi")
 	}
 	return
 }

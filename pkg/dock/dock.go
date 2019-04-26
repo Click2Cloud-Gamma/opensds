@@ -120,7 +120,7 @@ func (ds *dockServer) CreateVolume(ctx context.Context, opt *pb.CreateVolumeOpts
 		log.Error("when create volume in dock module:", err)
 		return pb.GenericResponseError(err), err
 	}
-	log.Info("Metadata aa gaya: ", vol.Metadata)
+	log.Info("Volume Created Successfully")
 	//Updating Volume status in DB
 	newx := c.NewContextFromJson(opt.GetContext())
 	db.C.UpdateStatus(newx, vol, model.VolumeAvailable)
