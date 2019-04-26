@@ -278,7 +278,6 @@ func (v *VolumePortal) ExtendVolume() {
 	// Volume extension request is sent to the Dock. Dock will update volume status to "available"
 	// after volume extension is completed.
 	var dockInfo *model.DockSpec
-	var pool *model.StoragePoolSpec
 	var install = "thin"
 	if install != "thin" {
 		if err := v.CtrClient.Connect(CONF.OsdsLet.ApiEndpoint); err != nil {
