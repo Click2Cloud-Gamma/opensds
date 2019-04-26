@@ -340,8 +340,10 @@ func (v *VolumePortal) ExtendVolume() {
 	} else {
 		log.Info("j1")
 		opt.PoolId = pool.Id
+		log.Info("pid", pool)
 		opt.PoolName = pool.Name
 		opt.DriverName = dockInfo.DriverName
+		log.Info("dock", dockInfo)
 		log.Info("Checke 21")
 		if _, err := v.DockClient.ExtendVolume(context.Background(), opt); err != nil {
 			log.Error("extend volume failed in controller service:", err)
