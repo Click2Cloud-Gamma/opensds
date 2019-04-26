@@ -172,7 +172,6 @@ func (v *VolumePortal) CreateVolume() {
 			log.Error("create volume failed in controller service:", err)
 			return
 		}
-		db.UpdateVolumeStatus(ctx, db.C, opt.Id, model.VolumeAvailable)
 		return
 	}
 }
@@ -317,7 +316,6 @@ func (v *VolumePortal) DeleteVolume() {
 		v.ErrorHandle(model.ErrorNotFound, errMsg)
 		return
 	}
-
 	// If profileId or poolId of the volume doesn't exist, it would mean that
 	// the volume provisioning operation failed before the create method in
 	// storage driver was called, therefore the volume entry should be deleted
@@ -352,11 +350,21 @@ func (v *VolumePortal) DeleteVolume() {
 	// NOTE:The real volume deletion process.
 	// Volume deletion request is sent to the Dock. Dock will delete volume from driver
 	// and database or update volume status to "errorDeleting" if deletion from driver faild.
-	if err := v.CtrClient.Connect(CONF.OsdsLet.ApiEndpoint); err != nil {
-		log.Error("when connecting controller client:", err)
-		return
+	var install = "thin"
+	if install != "thin" {
+		if err := v.CtrClient.Connect(CONF.OsdsLet.ApiEndpoint); err != nil {
+			log.Error("when connecting controller client:", err)
+			return
+		}
+	} else {
+		if err := v.DockClient.Connect(CONF.OsdsApiServer.ApiEndpoint); err != nil {
+			log.Error("when connecting dock client:", err)
+			return
+		}
 	}
+
 	defer v.CtrClient.Close()
+	defer v.DockClient.Close()
 
 	opt := &pb.DeleteVolumeOpts{
 		Id:        volume.Id,
@@ -366,12 +374,20 @@ func (v *VolumePortal) DeleteVolume() {
 		Context:   ctx.ToJson(),
 		Profile:   prf.ToJson(),
 	}
-	if _, err = v.CtrClient.DeleteVolume(context.Background(), opt); err != nil {
-		log.Error("delete volume failed in controller service:", err)
+
+	if install != "thin" {
+		if _, err = v.CtrClient.CreateVolume(context.Background(), opt); err != nil {
+			log.Error("create volume failed in controller service:", err)
+			return
+		}
+		return
+	} else {
+		if _, err := v.DockClient.CreateVolume(context.Background(), opt); err != nil {
+			log.Error("create volume failed in controller service:", err)
+			return
+		}
 		return
 	}
-
-	return
 }
 
 func NewVolumeAttachmentPortal() *VolumeAttachmentPortal {
