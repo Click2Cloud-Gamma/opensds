@@ -681,6 +681,18 @@ func (v *VolumeSnapshotPortal) CreateVolumeSnapshot() {
 		return
 	}
 
+	var install = "thin"
+
+	if install == "thin" {
+		volume, err := db.C.GetVolume(ctx, result.VolumeId)
+		if err != nil {
+			log.Error("create volume snapshot failed in controller service")
+			return
+		}
+		result.Metadata = volume.Metadata
+		result.Size = volume.Size
+	}
+
 	// Marshal the result.
 	body, _ := json.Marshal(result)
 	v.SuccessHandle(StatusAccepted, body)
@@ -688,7 +700,7 @@ func (v *VolumeSnapshotPortal) CreateVolumeSnapshot() {
 	// NOTE:The real volume snapshot creation process.
 	// Volume snapshot creation request is sent to the Dock. Dock will update volume snapshot status to "available"
 	// after volume snapshot creation complete.
-	var install = "thin"
+
 	if install != "thin" {
 		if err := v.CtrClient.Connect(CONF.OsdsLet.ApiEndpoint); err != nil {
 			log.Error("when connecting controller client:", err)
@@ -715,13 +727,8 @@ func (v *VolumeSnapshotPortal) CreateVolumeSnapshot() {
 	log.Info("opt:", opt)
 
 	if install == "thin" {
-		volume, err := db.C.GetVolume(ctx, opt.VolumeId)
-		if err != nil {
-			log.Error("create volume snapshot failed in controller service")
-			return
-		}
-		opt.Metadata = volume.Metadata
-		opt.Size = volume.Size
+
+		log.Info("volsize", opt.Size)
 		if _, err = v.DockClient.CreateVolumeSnapshot(context.Background(), opt); err != nil {
 			log.Error("create volume snapshot failed in controller service:", err)
 			return
