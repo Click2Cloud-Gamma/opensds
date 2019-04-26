@@ -90,15 +90,6 @@ func (v *VolumePortal) CreateVolume() {
 	var dockInfo *model.DockSpec
 	var install = "thin"
 	if install == "thin" {
-		if volume.SnapshotId != "" {
-			snap, err := db.C.GetVolumeSnapshot(ctx, volume.SnapshotId)
-			log.Info("Metadat:", snap.Metadata)
-			if err != nil {
-				db.UpdateVolumeStatus(ctx, db.C, volume.Id, model.VolumeError)
-				log.Error("get snapshot failed in create volume method: ", err)
-				return
-			}
-		}
 		pools, err = db.C.ListPools(c.NewAdminContext())
 
 		if err != nil {
