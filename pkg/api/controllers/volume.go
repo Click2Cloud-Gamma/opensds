@@ -916,11 +916,6 @@ func (v *VolumeSnapshotPortal) DeleteVolumeSnapshot() {
 			return
 		}
 	}
-	if _, err = v.CtrClient.DeleteVolumeSnapshot(context.Background(), opt); err != nil {
-		log.Error("delete volume snapthot failed in controller service:", err)
-		return
-	}
-
 	v.Ctx.Output.SetStatus(StatusAccepted)
 	return
 }
