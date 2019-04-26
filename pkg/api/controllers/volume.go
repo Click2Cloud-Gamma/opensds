@@ -323,7 +323,7 @@ func (v *VolumePortal) ExtendVolume() {
 	}
 	defer v.CtrClient.Close()
 	defer v.DockClient.Close()
-
+	log.Info("check-1")
 	opt := &pb.ExtendVolumeOpts{
 		Id:       id,
 		Size:     extendRequestBody.NewSize,
