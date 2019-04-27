@@ -86,7 +86,7 @@ func (v *VolumePortal) CreateVolume() {
 	}
 
 	var pools []*model.StoragePoolSpec
-	var dockInfo *model.DockSpec
+	//var dockInfo *model.DockSpec
 	var install = "thin"
 	if install == "thin" {
 		pools, err = db.C.ListPools(c.NewAdminContext())
