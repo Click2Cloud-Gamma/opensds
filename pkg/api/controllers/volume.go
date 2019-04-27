@@ -152,13 +152,14 @@ func (v *VolumePortal) CreateVolume() {
 			return
 		}
 	} else {
-		dockInfo, err = db.C.GetDock(ctx, pools[0].DockId)
-		if err != nil {
-			db.UpdateVolumeStatus(ctx, db.C, volume.Id, model.VolumeError)
-			log.Error("when search supported dock resource:", err.Error())
-			return
-		}
-		opt.DriverName = dockInfo.DriverName
+		//dockInfo, err = db.C.GetDock(ctx, pools[0].DockId)
+		//if err != nil {
+		//	db.UpdateVolumeStatus(ctx, db.C, volume.Id, model.VolumeError)
+		//	log.Error("when search supported dock resource:", err.Error())
+		//	return
+		//}
+		opt.DriverName = CONF.OsdsDock.EnabledBackends[0]
+		//dockInfo.DriverName
 		opt.PoolName = pools[0].Name
 
 		if _, err := v.DockClient.CreateVolume(context.Background(), opt); err != nil {
