@@ -84,12 +84,10 @@ func (v *VolumePortal) CreateVolume() {
 			return
 		}
 	}
-
+	// To get pool details for Thin OpenSDS
 	var pools []*model.StoragePoolSpec
-
 	if CONF.OsdsApiServer.InstallType == "thin" {
 		pools, err = db.C.ListPools(c.NewAdminContext())
-
 		if err != nil {
 			log.Error("when selecting pools for thin-opensds: ", err)
 			return
@@ -105,7 +103,6 @@ func (v *VolumePortal) CreateVolume() {
 		v.ErrorHandle(model.ErrorBadRequest, errMsg)
 		return
 	}
-
 	// Marshal the result.
 	body, _ := json.Marshal(result)
 	v.SuccessHandle(StatusAccepted, body)
@@ -113,7 +110,6 @@ func (v *VolumePortal) CreateVolume() {
 	// NOTE:The real volume creation process.
 	// Volume creation request is sent to the Dock. Dock will update volume status to "available"
 	// after volume creation is completed.
-
 	if CONF.OsdsApiServer.InstallType != "thin" {
 		if err := v.CtrClient.Connect(CONF.OsdsLet.ApiEndpoint); err != nil {
 			log.Error("when connecting controller client:", err)
@@ -125,7 +121,6 @@ func (v *VolumePortal) CreateVolume() {
 			return
 		}
 	}
-
 	defer v.CtrClient.Close()
 	defer v.DockClient.Close()
 
@@ -292,8 +287,7 @@ func (v *VolumePortal) ExtendVolume() {
 
 		var newSize = extendRequestBody.NewSize
 		if pool.FreeCapacity <= (newSize - result.Size) {
-			fmt.Sprintf("pool free capacity(%d) < new size(%d) - old size(%d)",
-				pool.FreeCapacity, newSize, result.Size)
+			log.Info("pool free capacity is less than volume size requested")
 			rollBack = true
 			return
 		}
@@ -513,13 +507,8 @@ func (v *VolumeAttachmentPortal) CreateVolumeAttachment() {
 			protocol = "iscsi"
 		}
 		opt.AccessProtocol = protocol
-		dockInfo, err := db.C.GetDockByPoolId(ctx, pol.Id)
-		if err != nil {
-			log.Error("when search supported dock resource: ", err)
-			return
-		}
 		opt.Metadata = vol.Metadata
-		opt.DriverName = dockInfo.DriverName
+		opt.DriverName = CONF.OsdsDock.EnabledBackends[0]
 		if _, err = v.DockClient.CreateVolumeAttachment(context.Background(), opt); err != nil {
 			log.Error("create volume attachment failed in controller service:", err)
 			return
@@ -766,18 +755,9 @@ func (v *VolumeSnapshotPortal) CreateVolumeSnapshot() {
 			log.Error("create volume snapshot failed in controller service")
 			return
 		}
-		dockInfo, err := db.C.GetDockByPoolId(ctx, volume.PoolId)
-		if err != nil {
-			log.Error("when search supported dock resource: ", err)
-			db.UpdateVolumeSnapshotStatus(ctx, db.C, result.Id, model.VolumeSnapError)
-			return
-		}
 		opt.Metadata = volume.Metadata
 		opt.Size = volume.Size
-		opt.DriverName = dockInfo.DriverName
-
-		log.Info("volsize", opt.Size)
-
+		opt.DriverName = CONF.OsdsDock.EnabledBackends[0]
 		if _, err = v.DockClient.CreateVolumeSnapshot(context.Background(), opt); err != nil {
 			log.Error("create volume snapshot failed in controller service:", err)
 			return
