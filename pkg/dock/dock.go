@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/opensds/opensds/pkg/utils/config"
 	"net"
 
 	log "github.com/golang/glog"
@@ -118,12 +119,14 @@ func (ds *dockServer) CreateVolume(ctx context.Context, opt *pb.CreateVolumeOpts
 	vol, err := ds.Driver.CreateVolume(opt)
 	if err != nil {
 		log.Error("when create volume in dock module:", err)
+
 		return pb.GenericResponseError(err), err
 	}
 	log.Info("Volume Created Successfully")
 	//Updating Volume status in DB
-	newx := c.NewContextFromJson(opt.GetContext())
-	db.C.UpdateStatus(newx, vol, model.VolumeAvailable)
+	if config.CONF.InstallType == "thin" {
+		db.C.UpdateStatus(c.NewContextFromJson(opt.GetContext()), vol, model.VolumeAvailable)
+	}
 	return pb.GenericResponseResult(vol), nil
 }
 
@@ -139,7 +142,10 @@ func (ds *dockServer) DeleteVolume(ctx context.Context, opt *pb.DeleteVolumeOpts
 		log.Error("error occurred in dock module when delete volume:", err)
 		return pb.GenericResponseError(err), err
 	}
-	// TODO: maybe need to update status in DB.
+	if config.CONF.InstallType == "thin" {
+		db.C.DeleteVolume(c.NewContextFromJson(opt.GetContext()), opt.GetId())
+	}
+
 	return pb.GenericResponseResult(nil), nil
 }
 
@@ -156,9 +162,11 @@ func (ds *dockServer) ExtendVolume(ctx context.Context, opt *pb.ExtendVolumeOpts
 		log.Error("when extend volume in dock module:", err)
 		return pb.GenericResponseError(err), err
 	}
-	//Updating Volume status in DB
-	newx := c.NewContextFromJson(opt.GetContext())
-	db.C.UpdateStatus(newx, vol, model.VolumeAvailable)
+	//TODO Update volume status for Full OpenSDS
+	//Updating Volume status in DB for thin opensds
+	if config.CONF.InstallType == "thin" {
+		db.C.UpdateStatus(c.NewContextFromJson(opt.GetContext()), vol, model.VolumeAvailable)
+	}
 	return pb.GenericResponseResult(vol), nil
 }
 
@@ -190,6 +198,17 @@ func (ds *dockServer) CreateVolumeAttachment(ctx context.Context, opt *pb.Create
 		},
 		ConnectionInfo: *connInfo,
 		Metadata:       opt.GetMetadata(),
+	}
+	if config.CONF.InstallType == "thin" {
+		var protocol = atc.AccessProtocol
+		if protocol == "" {
+			// Default protocol is iscsi
+			protocol = "iscsi"
+		}
+		opt.AccessProtocol = protocol
+		db.C.UpdateStatus(c.NewContextFromJson(opt.GetContext()), atc, model.VolumeAttachAvailable)
+		db.UpdateVolumeStatus(c.NewContextFromJson(opt.GetContext()), db.C, atc.VolumeId, model.VolumeInUse)
+
 	}
 	return pb.GenericResponseResult(atc), nil
 }
@@ -223,8 +242,9 @@ func (ds *dockServer) CreateVolumeSnapshot(ctx context.Context, opt *pb.CreateVo
 		log.Error("error occurred in dock module when create snapshot:", err)
 		return pb.GenericResponseError(err), err
 	}
-	newctx := c.NewContextFromJson(opt.GetContext())
-	db.C.UpdateStatus(newctx, snp, model.VolumeSnapAvailable)
+	if config.CONF.InstallType == "thin" {
+		db.C.UpdateStatus(c.NewContextFromJson(opt.GetContext()), snp, model.VolumeSnapAvailable)
+	}
 	log.Info("Snapshot Created Successfully")
 	return pb.GenericResponseResult(snp), nil
 }
@@ -241,12 +261,12 @@ func (ds *dockServer) DeleteVolumeSnapshot(ctx context.Context, opt *pb.DeleteVo
 		log.Error("error occurred in dock module when delete snapshot:", err)
 		return pb.GenericResponseError(err), err
 	}
-	//Updating database
-	newctx := c.NewContextFromJson(opt.GetContext())
-	if err2 := db.C.DeleteVolumeSnapshot(newctx, opt.Id); err2 != nil {
-		log.Error("error occurred in controller module when delete volume snapshot in db: ", err2)
-		db.UpdateVolumeSnapshotStatus(newctx, db.C, opt.Id, model.VolumeSnapErrorDeleting)
-		return pb.GenericResponseError(err2), err2
+	//Updating database for thin OprnSDS
+	if config.CONF.InstallType == "thin" {
+		if err2 := db.C.DeleteVolumeSnapshot(c.NewContextFromJson(opt.GetContext()), opt.Id); err2 != nil {
+			log.Error("error occurred in controller module when delete volume snapshot in db: ", err2)
+			db.UpdateVolumeSnapshotStatus(c.NewContextFromJson(opt.GetContext()), db.C, opt.Id, model.VolumeSnapErrorDeleting)
+		}
 	}
 	return pb.GenericResponseResult(nil), nil
 }
