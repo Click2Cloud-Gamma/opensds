@@ -29,7 +29,7 @@ import (
 	c "github.com/opensds/opensds/pkg/context"
 	"github.com/opensds/opensds/pkg/controller/client"
 	"github.com/opensds/opensds/pkg/db"
-	DckClient "github.com/opensds/opensds/pkg/dock/client"
+	dock "github.com/opensds/opensds/pkg/dock/client"
 	"github.com/opensds/opensds/pkg/model"
 	pb "github.com/opensds/opensds/pkg/model/proto"
 	. "github.com/opensds/opensds/pkg/utils/config"
@@ -38,14 +38,14 @@ import (
 func NewVolumePortal() *VolumePortal {
 	return &VolumePortal{
 		CtrClient:  client.NewClient(),
-		DockClient: DckClient.NewClient(),
+		DockClient: dock.NewClient(),
 	}
 }
 
 type VolumePortal struct {
 	BasePortal
 	CtrClient  client.Client
-	DockClient DckClient.Client
+	DockClient dock.Client
 }
 
 func (v *VolumePortal) CreateVolume() {
@@ -448,7 +448,7 @@ func (v *VolumePortal) DeleteVolume() {
 func NewVolumeAttachmentPortal() *VolumeAttachmentPortal {
 	return &VolumeAttachmentPortal{
 		CtrClient:  client.NewClient(),
-		DockClient: DckClient.NewClient(),
+		DockClient: dock.NewClient(),
 	}
 }
 
@@ -456,7 +456,7 @@ type VolumeAttachmentPortal struct {
 	BasePortal
 
 	CtrClient  client.Client
-	DockClient DckClient.Client
+	DockClient dock.Client
 }
 
 func (v *VolumeAttachmentPortal) CreateVolumeAttachment() {
@@ -491,11 +491,20 @@ func (v *VolumeAttachmentPortal) CreateVolumeAttachment() {
 	// NOTE:The real volume attachment creation process.
 	// Volume attachment creation request is sent to the Dock. Dock will update volume attachment status to "available"
 	// after volume attachment creation is completed.
-	if err := v.CtrClient.Connect(CONF.OsdsLet.ApiEndpoint); err != nil {
-		log.Error("when connecting controller client:", err)
-		return
+	var install = "thin"
+	if install != "thin" {
+		if err := v.CtrClient.Connect(CONF.OsdsLet.ApiEndpoint); err != nil {
+			log.Error("when connecting controller client:", err)
+			return
+		}
+	} else {
+		if err := v.DockClient.Connect(CONF.OsdsDock.ApiEndpoint); err != nil {
+			log.Error("when connecting dock client:", err)
+			return
+		}
 	}
 	defer v.CtrClient.Close()
+	defer v.DockClient.Close()
 
 	opt := &pb.CreateVolumeAttachmentOpts{
 		Id:       result.Id,
@@ -510,9 +519,42 @@ func (v *VolumeAttachmentPortal) CreateVolumeAttachment() {
 		Metadata: result.Metadata,
 		Context:  ctx.ToJson(),
 	}
-	if _, err = v.CtrClient.CreateVolumeAttachment(context.Background(), opt); err != nil {
-		log.Error("create volume attachment failed in controller service:", err)
-		return
+
+	if install == "thin" {
+		vol, err := db.C.GetVolume(ctx, result.VolumeId)
+		if err != nil {
+			log.Error("create volume attachment failed in controller service")
+			return
+		}
+
+		pol, err := db.C.GetPool(ctx, vol.PoolId)
+		if err != nil {
+			log.Error("get pool failed in create volume attachment method: ", err)
+			db.UpdateVolumeAttachmentStatus(ctx, db.C, opt.Id, model.VolumeAttachError)
+			return
+		}
+		var protocol = pol.Extras.IOConnectivity.AccessProtocol
+		if protocol == "" {
+			// Default protocol is iscsi
+			protocol = "iscsi"
+		}
+		opt.AccessProtocol = protocol
+		dockInfo, err := db.C.GetDockByPoolId(ctx, pol.Id)
+		if err != nil {
+			log.Error("when search supported dock resource: ", err)
+			return
+		}
+		opt.Metadata = vol.Metadata
+		opt.DriverName = dockInfo.DriverName
+		if _, err = v.DockClient.CreateVolumeAttachment(context.Background(), opt); err != nil {
+			log.Error("create volume attachment failed in controller service:", err)
+			return
+		}
+	} else {
+		if _, err = v.CtrClient.CreateVolumeAttachment(context.Background(), opt); err != nil {
+			log.Error("create volume attachment failed in controller service:", err)
+			return
+		}
 	}
 
 	return
@@ -615,11 +657,20 @@ func (v *VolumeAttachmentPortal) DeleteVolumeAttachment() {
 	// NOTE:The real volume attachment deletion process.
 	// Volume attachment deletion request is sent to the Dock. Dock will delete volume attachment from database
 	// or update its status to "errorDeleting" if volume connection termination failed.
-	if err := v.CtrClient.Connect(CONF.OsdsLet.ApiEndpoint); err != nil {
-		log.Error("when connecting controller client:", err)
-		return
+	var install = "thin"
+	if install != "thin" {
+		if err := v.CtrClient.Connect(CONF.OsdsLet.ApiEndpoint); err != nil {
+			log.Error("when connecting controller client:", err)
+			return
+		}
+	} else {
+		if err := v.DockClient.Connect(CONF.OsdsDock.ApiEndpoint); err != nil {
+			log.Error("when connecting dock client:", err)
+			return
+		}
 	}
 	defer v.CtrClient.Close()
+	defer v.DockClient.Close()
 
 	opt := &pb.DeleteVolumeAttachmentOpts{
 		Id:             attachment.Id,
@@ -635,9 +686,16 @@ func (v *VolumeAttachmentPortal) DeleteVolumeAttachment() {
 		Metadata: attachment.Metadata,
 		Context:  ctx.ToJson(),
 	}
-	if _, err = v.CtrClient.DeleteVolumeAttachment(context.Background(), opt); err != nil {
-		log.Error("delete volume attachment failed in controller service:", err)
-		return
+	if install == "thin" {
+		if _, err = v.DockClient.DeleteVolumeAttachment(context.Background(), opt); err != nil {
+			log.Error("delete volume attachment failed in controller service:", err)
+			return
+		}
+	} else {
+		if _, err = v.CtrClient.DeleteVolumeAttachment(context.Background(), opt); err != nil {
+			log.Error("delete volume attachment failed in controller service:", err)
+			return
+		}
 	}
 
 	return
@@ -646,13 +704,13 @@ func (v *VolumeAttachmentPortal) DeleteVolumeAttachment() {
 func NewVolumeSnapshotPortal() *VolumeSnapshotPortal {
 	return &VolumeSnapshotPortal{
 		CtrClient:  client.NewClient(),
-		DockClient: DckClient.NewClient(),
+		DockClient: dock.NewClient(),
 	}
 }
 
 type VolumeSnapshotPortal struct {
 	BasePortal
-	DockClient DckClient.Client
+	DockClient dock.Client
 	CtrClient  client.Client
 }
 
@@ -697,9 +755,7 @@ func (v *VolumeSnapshotPortal) CreateVolumeSnapshot() {
 				result.Metadata["bucket"] = profile.SnapshotProperties.Topology.Bucket
 			}
 		}
-
 	}
-
 	// Marshal the result.
 	body, _ := json.Marshal(result)
 	v.SuccessHandle(StatusAccepted, body)
