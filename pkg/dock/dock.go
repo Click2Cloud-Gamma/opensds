@@ -123,7 +123,8 @@ func (ds *dockServer) CreateVolume(ctx context.Context, opt *pb.CreateVolumeOpts
 		return pb.GenericResponseError(err), err
 	}
 	log.Info("Volume Created Successfully")
-	//Updating Volume status in DB
+	// TODO Update volume status for Full OpenSDS in DB
+	// Updating Volume status in DB
 	if config.CONF.InstallType == "thin" {
 		db.C.UpdateStatus(c.NewContextFromJson(opt.GetContext()), vol, model.VolumeAvailable)
 	}
@@ -142,6 +143,8 @@ func (ds *dockServer) DeleteVolume(ctx context.Context, opt *pb.DeleteVolumeOpts
 		log.Error("error occurred in dock module when delete volume:", err)
 		return pb.GenericResponseError(err), err
 	}
+	// TODO Update volume status for Full OpenSDS in DB
+	// To update database for Thin OpenSDS
 	if config.CONF.InstallType == "thin" {
 		db.C.DeleteVolume(c.NewContextFromJson(opt.GetContext()), opt.GetId())
 	}
@@ -162,8 +165,8 @@ func (ds *dockServer) ExtendVolume(ctx context.Context, opt *pb.ExtendVolumeOpts
 		log.Error("when extend volume in dock module:", err)
 		return pb.GenericResponseError(err), err
 	}
-	//TODO Update volume status for Full OpenSDS
-	//Updating Volume status in DB for thin opensds
+	// TODO Update volume status for Full OpenSDS in DB
+	// Updating Volume status in DB for thin opensds
 	if config.CONF.InstallType == "thin" {
 		db.C.UpdateStatus(c.NewContextFromJson(opt.GetContext()), vol, model.VolumeAvailable)
 	}
@@ -199,6 +202,7 @@ func (ds *dockServer) CreateVolumeAttachment(ctx context.Context, opt *pb.Create
 		ConnectionInfo: *connInfo,
 		Metadata:       opt.GetMetadata(),
 	}
+	// To update status in DB
 	if config.CONF.InstallType == "thin" {
 		var protocol = atc.AccessProtocol
 		if protocol == "" {
@@ -242,6 +246,8 @@ func (ds *dockServer) CreateVolumeSnapshot(ctx context.Context, opt *pb.CreateVo
 		log.Error("error occurred in dock module when create snapshot:", err)
 		return pb.GenericResponseError(err), err
 	}
+	// TODO Update Snapshot status for Full OpenSDS in DB
+	// To Update status of snashot in DB
 	if config.CONF.InstallType == "thin" {
 		db.C.UpdateStatus(c.NewContextFromJson(opt.GetContext()), snp, model.VolumeSnapAvailable)
 	}
@@ -261,7 +267,8 @@ func (ds *dockServer) DeleteVolumeSnapshot(ctx context.Context, opt *pb.DeleteVo
 		log.Error("error occurred in dock module when delete snapshot:", err)
 		return pb.GenericResponseError(err), err
 	}
-	//Updating database for thin OprnSDS
+	// TODO Update snapshot status for Full OpenSDS in DB
+	// Updating database for thin OpenSDS
 	if config.CONF.InstallType == "thin" {
 		if err2 := db.C.DeleteVolumeSnapshot(c.NewContextFromJson(opt.GetContext()), opt.Id); err2 != nil {
 			log.Error("error occurred in controller module when delete volume snapshot in db: ", err2)
