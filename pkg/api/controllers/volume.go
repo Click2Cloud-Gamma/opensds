@@ -87,13 +87,24 @@ func (v *VolumePortal) CreateVolume() {
 	}
 	// To get pool details for Thin OpenSDS
 	var pools []*model.StoragePoolSpec
+	var pool_id string
+	var pool_name string
 	if CONF.OsdsApiServer.InstallType == "thin" {
 		pools, err = db.C.ListPools(c.NewAdminContext())
 		if err != nil {
 			log.Error("when listing pools: ", err)
 			return
 		}
-		volume.PoolId = pools[0].Id
+		println(len(pools))
+		//Pool selecter for Thin OpenSDS
+		for i := 0; i < len(pools); i++ {
+			if volume.Size <= pools[i].FreeCapacity {
+				pool_id = pools[i].Id
+				pool_name = pools[i].Name
+				break
+			}
+		}
+		volume.PoolId = pool_id
 	}
 	// NOTE:It will create a volume entry into the database and initialize its status
 	// as "creating". It will not wait for the real volume creation to complete
@@ -148,7 +159,7 @@ func (v *VolumePortal) CreateVolume() {
 		}
 	} else {
 		opt.DriverName = CONF.OsdsDock.EnabledBackends[0]
-		opt.PoolName = pools[0].Name
+		opt.PoolName = pool_name
 		if _, err := v.DockClient.CreateVolume(context.Background(), opt); err != nil {
 			log.Error("create volume failed in controller service:", err)
 			return
