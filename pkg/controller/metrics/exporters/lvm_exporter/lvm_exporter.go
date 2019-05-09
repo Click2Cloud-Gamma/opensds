@@ -15,20 +15,23 @@ package main
 
 import (
 	"fmt"
-	log "github.com/golang/glog"
-	"github.com/opensds/opensds/contrib/drivers/lvm"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"strconv"
 	"sync"
+
+	log "github.com/golang/glog"
+	"github.com/opensds/opensds/contrib/drivers/lvm"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"gopkg.in/yaml.v2"
 )
 
-//struct for lvm  collector that contains pointers
-//to prometheus descriptors for each metric we expose.
+const DefaultConfigFile = "resources.yaml"
+
+// struct for lvm  collector that contains pointers
+// to prometheus descriptors for each metric we expose.
 type lvmCollector struct {
 	mu sync.Mutex
 	//volume metrics
@@ -47,58 +50,57 @@ type lvmCollector struct {
 	DiskUtilization     *prometheus.Desc
 }
 
-/* rr */
-//constructor for lvm collector that
-//initializes every descriptor and returns a pointer to the collector
+// constructor for lvm collector that
+// initializes every descriptor and returns a pointer to the collector
 func newLvmCollector() *lvmCollector {
 	var labelKeys = []string{"device"}
 
 	return &lvmCollector{
-		VolumeIOPS: prometheus.NewDesc("OpensSDS_Volume_IOPS_tps",
+		VolumeIOPS: prometheus.NewDesc("lvm_volume_iops_tps",
 			"Shows IOPS",
 			labelKeys, nil,
 		),
-		VolumeReadThroughput: prometheus.NewDesc("OpensSDS_Volume_ReadThroughput_KBs",
+		VolumeReadThroughput: prometheus.NewDesc("lvm_volume_readThroughput_kbs",
 			"Shows ReadThroughput",
 			labelKeys, nil,
 		),
-		VolumeWriteThroughput: prometheus.NewDesc("OpensSDS_Volume_WriteThroughput_KBs",
+		VolumeWriteThroughput: prometheus.NewDesc("lvm_volume_writeThroughput_kbs",
 			"Shows ReadThroughput",
 			labelKeys, nil,
 		),
-		VolumeResponseTime: prometheus.NewDesc("OpensSDS_Volume_ResponseTime_ms",
+		VolumeResponseTime: prometheus.NewDesc("lvm_volume_responseTime_ms",
 			"Shows ReadThroughput",
 			labelKeys, nil,
 		),
-		VolumeServiceTime: prometheus.NewDesc("OpensSDS_Volume_ServiceTime_ms",
+		VolumeServiceTime: prometheus.NewDesc("lvm_volume_serviceTime_ms",
 			"Shows ServiceTime",
 			labelKeys, nil,
 		),
-		VolumeUtilization: prometheus.NewDesc("OpensSDS_Volume_Utilization_prcnt",
+		VolumeUtilization: prometheus.NewDesc("lvm_volume_utilization_prcnt",
 			"Shows Utilization in percentage",
 			labelKeys, nil,
 		),
-		DiskIOPS: prometheus.NewDesc("OpensSDS_Volume_IOPS_tps",
+		DiskIOPS: prometheus.NewDesc("lvm_volume_iops_tps",
 			"Shows IOPS",
 			labelKeys, nil,
 		),
-		DiskReadThroughput: prometheus.NewDesc("OpensSDS_Disk_ReadThroughput_KBs",
+		DiskReadThroughput: prometheus.NewDesc("lvm_disk_readThroughput_kbs",
 			"Shows ReadThroughput",
 			labelKeys, nil,
 		),
-		DiskWriteThroughput: prometheus.NewDesc("OpensSDS_Disk_WriteThroughput_KBs",
+		DiskWriteThroughput: prometheus.NewDesc("lvm_disk_writeThroughput_kbs",
 			"Shows ReadThroughput",
 			labelKeys, nil,
 		),
-		DiskResponseTime: prometheus.NewDesc("OpensSDS_Disk_ResponseTime_ms",
+		DiskResponseTime: prometheus.NewDesc("lvm_disk_responseTime_ms",
 			"Shows ReadThroughput",
 			labelKeys, nil,
 		),
-		DiskServiceTime: prometheus.NewDesc("OpensSDS_Disk_ServiceTime_ms",
+		DiskServiceTime: prometheus.NewDesc("lvm_disk_serviceTime_ms",
 			"Shows ServiceTime",
 			labelKeys, nil,
 		),
-		DiskUtilization: prometheus.NewDesc("OpensSDS_Disk_Utilization_prcnt",
+		DiskUtilization: prometheus.NewDesc("lvm_disk_utilization_prcnt",
 			"Shows Utilization in percentage",
 			labelKeys, nil,
 		),
@@ -106,8 +108,8 @@ func newLvmCollector() *lvmCollector {
 
 }
 
-//Describe function.
-//It essentially writes all descriptors to the prometheus desc channel.
+// Describe function.
+// It essentially writes all descriptors to the prometheus desc channel.
 func (c *lvmCollector) Describe(ch chan<- *prometheus.Desc) {
 
 	//Update this section with the each metric you create for a given collector
@@ -131,10 +133,10 @@ type Config struct {
 }
 
 type Configs struct {
-	Cfgs []Config `resources`
+	Cfgs []*Config `resources`
 }
 
-//Collect implements required collect function for all promehteus collectors
+// Collect implements required collect function for all promehteus collectors
 func (c *lvmCollector) Collect(ch chan<- prometheus.Metric) {
 
 	c.mu.Lock()
@@ -143,10 +145,9 @@ func (c *lvmCollector) Collect(ch chan<- prometheus.Metric) {
 	//Implement logic here to determine proper metric value to return to prometheus
 	//for each descriptor
 	metricList := []string{"IOPS", "ReadThroughput", "WriteThroughput", "ResponseTime", "ServiceTime", "UtilizationPercentage"}
-	filename := "resources.yaml"
 	source, err := ioutil.ReadFile("/home/demo/go/src/github.com/opensds/opensds/pkg/controller/metrics/exporters/lvm_exporter/resources.yaml")
 	if err != nil {
-		log.Fatal("file "+filename+"can't read", err)
+		log.Fatal("file "+DefaultConfigFile+"can't read", err)
 	}
 	var config Configs
 	err1 := yaml.Unmarshal(source, &config)
@@ -154,7 +155,6 @@ func (c *lvmCollector) Collect(ch chan<- prometheus.Metric) {
 		log.Fatalf("error: %v", err)
 	}
 
-	//volumeList := []string{"sda", "loop0"}
 	metricDriver := lvm.MetricDriver{}
 	metricDriver.Setup()
 	for _, resource := range config.Cfgs {
@@ -162,10 +162,8 @@ func (c *lvmCollector) Collect(ch chan<- prometheus.Metric) {
 		case "volume":
 			for _, volume := range resource.Devices {
 				metricArray, _ := metricDriver.CollectMetrics(metricList, volume, "volume")
-				fmt.Println(metricArray)
 				for _, metric := range metricArray {
 					lableVals := []string{metric.InstanceName}
-					//unitLabel := "Unit:"+metric.Unit
 					switch metric.Name {
 					case "IOPS":
 						ch <- prometheus.MustNewConstMetric(c.VolumeIOPS, prometheus.GaugeValue, metric.MetricValues[0].Value, lableVals...)
@@ -187,11 +185,9 @@ func (c *lvmCollector) Collect(ch chan<- prometheus.Metric) {
 
 		case "disk":
 			for _, volume := range resource.Devices {
-				metricArray, _ := metricDriver.CollectMetrics(metricList, volume, "disk")
-				fmt.Println(metricArray)
+				metricArray, _ := metricDriver.CollectMetrics(metricList, volume, "volume")
 				for _, metric := range metricArray {
 					lableVals := []string{metric.Labels["device"]}
-					//unitLabel := "Unit:"+metric.Unit
 					switch metric.Name {
 					case "IOPS":
 						ch <- prometheus.MustNewConstMetric(c.DiskIOPS, prometheus.GaugeValue, metric.MetricValues[0].Value, lableVals...)
@@ -238,6 +234,6 @@ func main() {
 	//This section will start the HTTP server and expose
 	//any metrics on the /metrics endpoint.
 	http.Handle("/metrics", promhttp.Handler())
-	//log.Info("lvm exporter begining to serve on port :" + 9120)
+	//log.Info("lvm exporter begining to serve on port :" + portNo)
 	log.Fatal(http.ListenAndServe("192.168.1.145:9120", nil))
 }
