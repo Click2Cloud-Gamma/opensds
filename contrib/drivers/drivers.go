@@ -136,7 +136,7 @@ type MetricDriver interface {
 	//Any operation the metric driver does while stopping.
 	Teardown() error
 
-	CollectMetrics(metricList []string, instanceID string) ([]*model.MetricSpec, error)
+	CollectMetrics(metricList []string, instanceID string, resource string) ([]*model.MetricSpec, error)
 	ValidateMetricsSupportList(metricList []string, resourceType string) ([]string, error)
 }
 
@@ -146,6 +146,9 @@ func InitMetricDriver(resourceType string) MetricDriver {
 	switch resourceType {
 	case config.LVMDriverType:
 		d = &lvm.MetricDriver{}
+		break
+	case config.CephDriverType:
+		d = &ceph.MetricDriver{}
 		break
 	default:
 		//d = &sample.Driver{}

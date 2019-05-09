@@ -14,7 +14,6 @@
 
 /*
 This module implements the common data structure.
-
 */
 
 package model
@@ -61,9 +60,7 @@ type MetricSpec struct {
 	Job string `json:"job,omitempty"`
 
 	/*associator - Some metric would need specific fields to relate components.
-
 	  Use case could be to query volumes of a particular pool. Attaching the related
-
 	  components as labels would help us to form promQl query efficiently.
 	  Example: node_disk_read_bytes_total{instance="121.244.95.60"}
 	  Above query will respond with all disks associated with node 121.244.95.60
@@ -71,13 +68,13 @@ type MetricSpec struct {
 	  the associated component type as key and component name as value
 	  Example: associator[pool]=pool1 */
 
-	Associator map[string]string `json:"associator,omitempty"`
+	Labels map[string]string `json:"associator,omitempty"`
 
 	// Following fields can be used to form a unique metric name
 
 	// source -\> Node/Dock
 
-	Source string `json:"source,omitempty"`
+	//Source string `json:"source,omitempty"`
 
 	// component -\> disk/logicalVolume/VG etc
 
@@ -91,21 +88,13 @@ type MetricSpec struct {
 
 	Unit string `json:"unit,omitempty"`
 
-	// is aggregated
-
-	IsAggregated bool `json:"isAggregated,omitempty"`
-
-	// aggr_type-\> Can be used to determine Total/Sum/Avg etc
+	// Can be used to determine Total/Avg etc
+	AggrType string `json:"unit,omitempty"`
 
 	/*If isAggregated ='True' then type of aggregation can be set in this field
-
 	  ie:- if collector is aggregating some metrics and producing a new metric of
-
 	  higher level constructs, then this field can be set as 'Total' to indicate it is
-
 	  aggregated/derived from other metrics.*/
-
-	//aggr_type AGGR_TYPE
 
 	MetricValues []*Metric `json:"metricValues,omitempty"`
 }

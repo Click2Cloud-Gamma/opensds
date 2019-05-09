@@ -90,7 +90,7 @@ func (c *MetricCli) parseCommandOutput(metricList []string, returnMap map[string
 // metricList	-> metrics to be collected
 // instanceID	-> for which instance to be collected
 // returnMap	-> metrics to value map
-func (cli *MetricCli) CollectMetrics(metricList []string, instanceID string) (map[string]string, error) {
+func (cli *MetricCli) CollectMetrics(metricList []string, instanceID string, resource string) (map[string]string, error) {
 
 	returnMap := make(map[string]string)
 	var err error

@@ -1,19 +1,8 @@
-// Copyright (c) 2019 The OpenSDS Authors.
-//
-//    Licensed under the Apache License, Version 2.0 (the "License"); you may
-//    not use this file except in compliance with the License. You may obtain
-//    a copy of the License at
-//
-//         http://www.apache.org/licenses/LICENSE-2.0
-//
-//    Unless required by applicable law or agreed to in writing, software
-//    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
-//    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
-//    License for the specific language governing permissions and limitations
-//    under the License.
-package lvm
+package ceph
 
 import (
+	"fmt"
+
 	log "github.com/golang/glog"
 	"github.com/opensds/opensds/pkg/model"
 	"gopkg.in/yaml.v2"
@@ -25,33 +14,62 @@ import (
 
 var data = `
 resources:
-  - resource: volume
-    metrics:
-      - IOPS
-      - ReadThroughput
-      - WriteThroughput
-      - ResponseTime
-      - ServiceTime
-      - UtilizationPercentage
-    units:
-      - tps
-      - KB/s
-      - KB/s
-      - ms
-      - ms
-      - '%'
-  - resource: pool
-    metrics:
-      - ReadRequests
-      - WriteRequests
-      - ReponseTime
-    units:
-      - tps
-      - KB/s
-      - KB/s
-      - ms
-      - ms
-      - '%'
+ - resource: health
+   metrics:
+    - Severity
+    - Summary
+    - Message
+    - OverallStatus
+    - Status
+    - NumOSDs
+    - NumUpOSDs
+    - NumInOSDs
+    - NumRemappedPGs
+    - NumPGs
+    - WriteOpPerSec
+    - ReadOpPerSec           
+    - WriteBytePerSec
+    - ReadBytePerSec
+    - RecoveringObjectsPerSec
+    - RecoveringBytePerSec
+    - RecoveringKeysPerSec
+    - CacheFlushBytePerSec
+    - CacheEvictBytePerSec
+    - CachePromoteOpPerSec
+    - DegradedObjects
+    - MisplacedObjects
+    - Count
+    - States
+   units:
+    - ""
+    - ""
+    - ""
+    - ""
+    - ""
+    - ""
+    - ""
+    - ""
+    - ""
+    - ""
+    - Op/s
+    - Op/s
+    - bytes/s
+    - bytes/s
+    - objects/s
+    - bytes/s
+    - keys/s
+    - bytes/s
+    - bytes/s
+    - Op/s
+    - ""
+    - ""
+    - ""
+    - ""
+ - resource: cluster
+   metrics:
+    - TotalBytes
+   units:
+    - B
 `
 
 type Config struct {
@@ -64,7 +82,6 @@ type Configs struct {
 	Cfgs []Config `resources`
 }
 type MetricDriver struct {
-	cli *MetricCli
 }
 
 func metricInMetrics(metric string, metriclist []string) bool {
@@ -96,7 +113,13 @@ func getMetricToUnitMap() map[string]string {
 	for _, resources := range configs.Cfgs {
 		switch resources.Resource {
 		//ToDo: Other Cases needs to be added
-		case "volume":
+		case "health":
+			for index, metricName := range resources.Metrics {
+
+				metricToUnitMap[metricName] = resources.Units[index]
+
+			}
+		case "cluster":
 			for index, metricName := range resources.Metrics {
 
 				metricToUnitMap[metricName] = resources.Units[index]
@@ -122,19 +145,38 @@ func (d *MetricDriver) ValidateMetricsSupportList(metricList []string, resourceT
 	}
 
 	for _, resources := range configs.Cfgs {
-		switch resources.Resource {
-		//ToDo: Other Cases needs to be added
-		case "volume":
+
+		if resources.Resource == resourceType {
 			for _, metricName := range metricList {
 				if metricInMetrics(metricName, resources.Metrics) {
 					supportedMetrics = append(supportedMetrics, metricName)
 
 				} else {
-					log.Infof("metric:%s is not in the supported list", metricName)
+					fmt.Printf("\n metric: %v is not in the supported list", metricName)
 				}
 			}
+
 		}
+		//switch resources.Resource {
+		////ToDo: Other Cases needs to be added
+		//case resourceType:
+		//	for _, metricName := range metricList {
+		//		if metricInMetrics(metricName, resources.Metrics) {
+		//			supportedMetrics = append(supportedMetrics, metricName)
+		//
+		//
+		//		} else {
+		//			fmt.Printf("\n metric: %v is not in the supported list", metricName)
+		//		}
+		//	}
+		//default:
+		//	break
+		//
+		//
+		//}
+
 	}
+
 	return supportedMetrics, nil
 }
 
@@ -151,14 +193,15 @@ func (d *MetricDriver) CollectMetrics(metricsList []string, instanceID string, r
 	if supportedMetrics == nil {
 		log.Infof("No metrics found in the  supported metric list")
 	}
-	metricMap, err := d.cli.CollectMetrics(supportedMetrics, instanceID, resource)
+	metricMap, err := CollectMetrics(supportedMetrics, instanceID, resource)
 
 	var tempMetricArray []*model.MetricSpec
-	for _, element := range metricsList {
+	for _, element := range supportedMetrics {
+
 		val, _ := strconv.ParseFloat(metricMap[element], 64)
 		//Todo: See if association  is required here, resource discovery could fill this information
 		associatorMap := make(map[string]string)
-		associatorMap["device"] = metricMap["InstanceName"]
+		associatorMap["Cluster"] = "ceph"
 		metricValue := &model.Metric{
 			Timestamp: getCurrentUnixTimestamp(),
 			Value:     val,
@@ -188,11 +231,6 @@ func (d *MetricDriver) CollectMetrics(metricsList []string, instanceID string, r
 
 func (d *MetricDriver) Setup() error {
 
-	cli, err := NewMetricCli()
-	if err != nil {
-		return err
-	}
-	d.cli = cli
 	return nil
 }
 

@@ -14,6 +14,7 @@
 package lvm
 
 import (
+	"fmt"
 	"testing"
 )
 
@@ -31,12 +32,14 @@ func TestCollectMetrics(t *testing.T) {
 	metricList := []string{"IOPS", "ReadThroughput", "WriteThroughput", "ResponseTime", "ServiceTime", "UtilizationPercentage"}
 	var metricDriver = &MetricDriver{}
 	metricDriver.Setup()
-	metricArray, err := metricDriver.CollectMetrics(metricList, "sda")
+	metricArray, err := metricDriver.CollectMetrics(metricList, "sda", "")
 	if err != nil {
 		t.Errorf("collectMetrics call to lvm driver failed: %+v\n", err)
 	}
 	for _, m := range metricArray {
-		t.Log(*m)
+		t.Log(*(m.MetricValues[0]))
+		//fmt.Sprintf("%v \n",*m)
+		fmt.Println(*m)
 	}
 
 }
