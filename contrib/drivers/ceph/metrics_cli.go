@@ -69,50 +69,6 @@ type cephPerfStat struct {
 	} `json:"osd_perf_infos"`
 }
 
-type cephHealthStats struct {
-	Health struct {
-		Summary []struct {
-			Severity string `json:"severity"`
-			Summary  string `json:"summary"`
-		} `json:"summary"`
-		OverallStatus string `json:"overall_status"`
-		Status        string `json:"status"`
-		Checks        map[string]struct {
-			Severity string `json:"severity"`
-			Summary  struct {
-				Message string `json:"message"`
-			} `json:"summary"`
-		} `json:"checks"`
-	} `json:"health"`
-	OSDMap struct {
-		OSDMap struct {
-			NumOSDs        float64 `json:"num_osds"`
-			NumUpOSDs      float64 `json:"num_up_osds"`
-			NumInOSDs      float64 `json:"num_in_osds"`
-			NumRemappedPGs float64 `json:"num_remapped_pgs"`
-		} `json:"osdmap"`
-	} `json:"osdmap"`
-	PGMap struct {
-		NumPGs                  float64 `json:"num_pgs"`
-		WriteOpPerSec           float64 `json:"write_op_per_sec"`
-		ReadOpPerSec            float64 `json:"read_op_per_sec"`
-		WriteBytePerSec         float64 `json:"write_bytes_sec"`
-		ReadBytePerSec          float64 `json:"read_bytes_sec"`
-		RecoveringObjectsPerSec float64 `json:"recovering_objects_per_sec"`
-		RecoveringBytePerSec    float64 `json:"recovering_bytes_per_sec"`
-		RecoveringKeysPerSec    float64 `json:"recovering_keys_per_sec"`
-		CacheFlushBytePerSec    float64 `json:"flush_bytes_sec"`
-		CacheEvictBytePerSec    float64 `json:"evict_bytes_sec"`
-		CachePromoteOpPerSec    float64 `json:"promote_op_per_sec"`
-		DegradedObjects         float64 `json:"degraded_objects"`
-		MisplacedObjects        float64 `json:"misplaced_objects"`
-		PGsByState              []struct {
-			Count  float64 `json:"count"`
-			States string  `json:"state_name"`
-		} `json:"pgs_by_state"`
-	} `json:"pgmap"`
-}
-
 func (cli *MetricCli) CollectMetrics(metricList []string, instanceID string, resourceType string) ([]CephMetricStats, error) {
 
 	returnMap := []CephMetricStats{}
