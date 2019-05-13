@@ -24,6 +24,17 @@ import (
 // TODO: Move this Yaml config to a file
 var data = `
 resources:
+  - resource: cluster
+    metrics:
+      - cluster_capacity_bytes
+      - cluster_available_bytes
+      - cluster_used_bytes
+      - cluster_objects
+    units:
+      - bytes
+      - bytes
+      - bytes
+      - ""
   - resource: pool
     metrics:
       - pool_used_bytes
@@ -45,6 +56,13 @@ resources:
       - bytes
       - ""
       - bytes
+  - resource: osd
+    metrics:
+      - osd_perf_commit_latency
+      - osd_perf_apply_latency
+    units:
+      - ms
+      - ms
 `
 
 type Config struct {
@@ -90,9 +108,7 @@ func (d *MetricDriver) ValidateMetricsSupportList(metricList []string, resourceT
 	}
 
 	for _, resources := range configs.Cfgs {
-		switch resources.Resource {
-		// TODO: Other Cases needs to be added
-		case "pool":
+		if resources.Resource == resourceType {
 			for _, metricName := range metricList {
 				if metricInMetrics(metricName, resources.Metrics) {
 					supportedMetrics = append(supportedMetrics, metricName)
@@ -110,25 +126,25 @@ func (d *MetricDriver) ValidateMetricsSupportList(metricList []string, resourceT
 //	metricsList-> posted metric list
 //	instanceID -> posted instanceID
 //	metricArray	-> the array of metrics to be returned
-func (d *MetricDriver) CollectMetrics(metricsList []string, instanceID string) ([]*model.MetricSpec, error) {
+func (d *MetricDriver) CollectMetrics(metricsList []string, instanceID string, resourceType string) ([]*model.MetricSpec, error) {
 
 	//validate metric support list
-	supportedMetrics, err := d.ValidateMetricsSupportList(metricsList, "pool")
+	supportedMetrics, err := d.ValidateMetricsSupportList(metricsList, resourceType)
 	if supportedMetrics == nil {
 		log.Infof("No metrics found in the  supported metric list")
 	}
-	metricMap, err := d.cli.CollectMetrics(supportedMetrics, instanceID)
+	metricMap, err := d.cli.CollectMetrics(supportedMetrics, instanceID, resourceType)
 
 	var tempMetricArray []*model.MetricSpec
-	total_metrics_count := len(supportedMetrics) * len(metricMap)
+	total_metrics_count := len(metricMap) //len(supportedMetrics) * len(metricMap)
 
 	for i := 0; i < total_metrics_count; i++ {
 		val, _ := strconv.ParseFloat(metricMap[i].Value, 64)
-		//Todo: See if association  is required here, resource discovery could fill this information
 		associatorMap := make(map[string]string)
 		associatorMap["cluster"] = metricMap[i].Const_Label
-		//TODO: "pool" mention here will be resourceType
-		associatorMap["pool"] = metricMap[i].Var_Label
+		if metricMap[i].Var_Label != "" {
+			associatorMap[resourceType] = metricMap[i].Var_Label
+		}
 		metricValue := &model.Metric{
 			Timestamp: getCurrentUnixTimestamp(),
 			Value:     val,
@@ -141,10 +157,8 @@ func (d *MetricDriver) CollectMetrics(metricsList []string, instanceID string) (
 			InstanceName: "",
 			Job:          "OpenSDS",
 			Labels:       associatorMap,
-			//Todo Take Componet from Post call, as of now it is only for pool
-			Component: "pool",
-			Name:      metricMap[i].Name,
-			//Todo : Fill units according to metric type
+			Component:    resourceType,
+			Name:         metricMap[i].Name,
 			Unit:         metricMap[i].Unit,
 			AggrType:     metricMap[i].AggrType,
 			MetricValues: metricValues,
