@@ -21,6 +21,7 @@ import (
 )
 
 type MetricCli struct {
+	conn *rados.Conn
 }
 
 type CephMetricStats struct {
@@ -69,25 +70,35 @@ type cephPerfStat struct {
 	} `json:"osd_perf_infos"`
 }
 
-func (cli *MetricCli) CollectMetrics(metricList []string, instanceID string, resourceType string) ([]CephMetricStats, error) {
+func NewMetricCli() (*MetricCli, error) {
 
-	returnMap := []CephMetricStats{}
-	var err error
+	//var err error
 	conn, err := rados.NewConn()
 	if err != nil {
 		log.Error("when connecting to rados:", err)
+		return nil, err
 	}
-
+	//
 	err = conn.ReadDefaultConfigFile()
 	if err != nil {
 		log.Error("file ReadDefaultConfigFile can't read", err)
+		return nil, err
 	}
 
 	err = conn.Connect()
 	if err != nil {
 		log.Error("when connecting to ceph cluster:", err)
+		return nil, err
 	}
 
+	return &MetricCli{
+		conn: conn,
+	}, nil
+}
+
+func (cli *MetricCli) CollectMetrics(metricList []string, instanceID string, resourceType string) ([]CephMetricStats, error) {
+
+	returnMap := []CephMetricStats{}
 	switch resourceType {
 	case "pool":
 		cmd, err := json.Marshal(map[string]interface{}{
@@ -100,7 +111,7 @@ func (cli *MetricCli) CollectMetrics(metricList []string, instanceID string, res
 			// should fail.
 			log.Errorf("cmd failed with %s\n", err)
 		}
-		buf, _, err := conn.MonCommand(cmd)
+		buf, _, err := cli.conn.MonCommand(cmd)
 		pool_stats := &cephPoolStats{}
 		if err := json.Unmarshal(buf, pool_stats); err != nil {
 			log.Fatalf("Unmarshal error: %v", err)
@@ -202,7 +213,7 @@ func (cli *MetricCli) CollectMetrics(metricList []string, instanceID string, res
 			// should fail.
 			log.Errorf("cmd failed with %s\n", err)
 		}
-		buf, _, err := conn.MonCommand(cmd)
+		buf, _, err := cli.conn.MonCommand(cmd)
 		cluster_stats := &cephClusterStats{}
 		if err := json.Unmarshal(buf, cluster_stats); err != nil {
 
@@ -256,7 +267,7 @@ func (cli *MetricCli) CollectMetrics(metricList []string, instanceID string, res
 		if err != nil {
 			log.Errorf("cmd failed with %s\n", err)
 		}
-		buf, _, err := conn.MonCommand(cmd)
+		buf, _, err := cli.conn.MonCommand(cmd)
 		if err != nil {
 			log.Errorf("unable to collect data from ceph osd perf")
 		}
@@ -295,6 +306,5 @@ func (cli *MetricCli) CollectMetrics(metricList []string, instanceID string, res
 		}
 
 	}
-	conn.Shutdown()
 	return returnMap, nil
 }

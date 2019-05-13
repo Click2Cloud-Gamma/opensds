@@ -30,11 +30,6 @@ resources:
       - cluster_available_bytes
       - cluster_used_bytes
       - cluster_objects
-    units:
-      - bytes
-      - bytes
-      - bytes
-      - ""
   - resource: pool
     metrics:
       - pool_used_bytes
@@ -46,23 +41,10 @@ resources:
       - pool_read_bytes_total
       - pool_write_total
       - pool_write_bytes_total
-    units:
-      - bytes
-      - bytes
-      - bytes
-      - ""
-      - ""
-      - ""
-      - bytes
-      - ""
-      - bytes
   - resource: osd
     metrics:
       - osd_perf_commit_latency
       - osd_perf_apply_latency
-    units:
-      - ms
-      - ms
 `
 
 type Config struct {
@@ -171,8 +153,16 @@ func (d *MetricDriver) CollectMetrics(metricsList []string, instanceID string, r
 }
 
 func (d *MetricDriver) Setup() error {
-
+	cli, err := NewMetricCli()
+	if err != nil {
+		return err
+	}
+	d.cli = cli
 	return nil
+
 }
 
-func (*MetricDriver) Teardown() error { return nil }
+func (d *MetricDriver) Teardown() error {
+	d.cli.conn.Shutdown()
+	return nil
+}
