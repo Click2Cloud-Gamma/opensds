@@ -556,7 +556,6 @@ func (c *Client) DeleteFileShareAcl(ctx *c.Context, aclID string) error {
 	return nil
 }
 
-
 // DeleteFileShare
 func (c *Client) DeleteFileShare(ctx *c.Context, fileshareID string) error {
 	// If an admin want to access other tenant's resource just fake other's tenantId.

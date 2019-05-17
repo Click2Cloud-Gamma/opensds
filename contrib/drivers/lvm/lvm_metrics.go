@@ -178,8 +178,8 @@ func (d *MetricDriver) CollectMetrics(metricsList []string, instanceID string) (
 			//Todo : Fill units according to metric type
 			Unit: metricToUnitMap[element],
 			//Todo : Get this information dynamically ( hard coded now , as all are direct values
-			AggrType:     "",
-			MetricValues: metricValues,
+			AggrType: "",
+			//MetricValues: metricValues,
 		}
 		tempMetricArray = append(tempMetricArray, metric)
 	}
