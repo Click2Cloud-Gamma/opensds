@@ -155,6 +155,6 @@ func (d *MetricDriver) Setup() error {
 }
 
 func (d *MetricDriver) Teardown() error {
-	d.cli.conn.Shutdown()
+	d.cli.con.Shutdown()
 	return nil
 }

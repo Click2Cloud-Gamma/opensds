@@ -21,7 +21,7 @@ import (
 )
 
 type MetricCli struct {
-	conn *rados.Conn
+	con Conn
 }
 
 func NewMetricCli() (*MetricCli, error) {
@@ -45,9 +45,19 @@ func NewMetricCli() (*MetricCli, error) {
 	}
 
 	return &MetricCli{
-		conn,
+		con: conn,
 	}, nil
 }
+
+type Conn interface {
+	ReadDefaultConfigFile() error
+	Connect() error
+	Shutdown()
+	MonCommand([]byte) ([]byte, string, error)
+}
+
+// Verify that *rados.Conn implements Conn correctly.
+var _ Conn = &rados.Conn{}
 
 type CephMetricStats struct {
 	Name        string
@@ -76,6 +86,10 @@ type cephPoolStats struct {
 	} `json:"pools"`
 }
 
+func (cli *MetricCli) Command(args []byte) ([]byte, string, error) {
+	return cli.con.MonCommand(args)
+}
+
 func (cli *MetricCli) CollectMetrics(metricList []string, instanceID string) ([]CephMetricStats, error) {
 	returnMap := []CephMetricStats{}
 	cmd, err := json.Marshal(map[string]interface{}{
@@ -86,11 +100,11 @@ func (cli *MetricCli) CollectMetrics(metricList []string, instanceID string) ([]
 	if err != nil {
 		log.Errorf("cmd failed with %s\n", err)
 	}
+	println(cmd[0])
 
-	buf, _, err := cli.conn.MonCommand(cmd)
+	buf, _, err := cli.Command(cmd)
 	if err != nil {
 	}
-
 	pool_stats := &cephPoolStats{}
 	if err := json.Unmarshal(buf, pool_stats); err != nil {
 		log.Errorf("unmarshal error: %v", err)
