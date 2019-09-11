@@ -75,6 +75,7 @@ func InitReplicationDriver(resourceType string) (ReplicationDriver, error) {
 		break
 	case driversConfig.ScutechCMSDriverType:
 		d = &scms.ReplicationDriver{}
+		break
 	case driversConfig.CephDriverType:
 		d = &ceph.ReplicationDriver{}
 		break

@@ -249,15 +249,27 @@ func (d *Driver) CreateVolume(opt *pb.CreateVolumeOpts) (*model.VolumeSpec, erro
 	if opt.GetSnapshotId() != "" {
 		if opt.SnapshotFromCloud {
 			err = d.createVolumeFromCloud(opt)
+			if err != nil {
+				log.Error(err)
+			}
 		} else {
 			err = d.createVolumeFromSnapshot(opt)
+			if err != nil {
+				log.Error(err)
+			}
 		}
 	} else {
 		if opt.GetMetadata()["cephsnap"] != "" {
 			opt.SnapshotId = opt.GetMetadata()["cephsnap"]
 			err = d.createVolumeFromSnapshot(opt)
+			if err != nil {
+				log.Error(err)
+			}
 		} else {
 			err = d.createVolume(opt)
+			if err != nil {
+				log.Error(err)
+			}
 		}
 	}
 
