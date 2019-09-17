@@ -31,9 +31,12 @@ pool:
 #replication:
 #  hostip: 192.168.1.145
 #  peerip: 192.168.1.88
-#  username: root
-#  password: ROOT#123
+#  hostusername: root
+#  hostpassword: ROOT#123
+#  peerusername: root
+#  peerpassword: ROOT#123
 #  hostDialIP: 192.168.1.145:22
 #  peerDialIP: 192.168.1.88:22
-#  filePath: /etc/ceph/
+#  hostfilePath: /etc/ceph/
+#  peerfilePath: /etc/ceph/
 

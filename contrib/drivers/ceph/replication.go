@@ -33,11 +33,14 @@ type ReplicationDriver struct {
 type Replication struct {
 	IPaddresshost string `yaml:"hostip,omitempty"`
 	Ipaddresspeer string `yaml:"peerip,omitempty"`
-	Username      string `yaml:"username,omitempty"`
-	Password      string `yaml:"password,omitempty"`
+	Hostusername  string `yaml:"hostusername,omitempty"`
+	Hostpassword  string `yaml:"hostpassword,omitempty"`
+	Peerusername  string `yaml:"peerusername,omitempty"`
+	Peerpassword  string `yaml:"peerpassword,omitempty"`
 	HostDialIP    string `yaml:"hostDialIP,omitempty"`
 	PeerDialIP    string `yaml:"peerDialIP,omitempty"`
-	FilePath      string `yaml:"filePath,omitempty"`
+	HostfilePath  string `yaml:"hostfilePath,omitempty"`
+	PeerfilePath  string `yaml:"peerfilePath,omitempty"`
 }
 
 type Config struct {
@@ -49,7 +52,7 @@ type Config struct {
 
 func (r *ReplicationDriver) CephClient() *ssh.Client {
 
-	pwdCiphertext := r.conf.Password
+	pwdCiphertext := r.conf.Hostpassword
 	// password Encrypt
 	pwdTool := pwd.NewAES()
 	pwdEncrypt, err := pwdTool.Encrypter(pwdCiphertext)
@@ -63,7 +66,7 @@ func (r *ReplicationDriver) CephClient() *ssh.Client {
 	}
 
 	cephconfig := &ssh.ClientConfig{
-		User: r.conf.Username,
+		User: r.conf.Hostusername,
 		Auth: []ssh.AuthMethod{
 			ssh.Password(pwdDecrypt),
 		},
@@ -79,9 +82,9 @@ func (r *ReplicationDriver) CephClient() *ssh.Client {
 
 func (r *ReplicationDriver) BackupClient() *ssh.Client {
 	backupconfig := &ssh.ClientConfig{
-		User: r.conf.Username,
+		User: r.conf.Peerusername,
 		Auth: []ssh.AuthMethod{
-			ssh.Password(r.conf.Password),
+			ssh.Password(r.conf.Peerpassword),
 		},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
@@ -217,7 +220,7 @@ func (r *ReplicationDriver) CreateReplication(opt *pb.CreateReplicationOpts) (*m
 
 	// Copy the keys and configs of ceph cluster to remote cluster. The rbd-mirror in the primary cluster requires the key from the secondary and vice versa.
 
-	cmd := "scp " + r.conf.FilePath + "ceph.client.ceph.keyring " + r.conf.FilePath + "ceph.conf root@" + r.conf.Ipaddresspeer + ":" + r.conf.FilePath
+	cmd := "scp " + r.conf.HostfilePath + "ceph.client.ceph.keyring " + r.conf.HostfilePath + "ceph.conf root@" + r.conf.Ipaddresspeer + ":" + r.conf.PeerfilePath
 	if err := cephscpsession.Run(cmd); err != nil {
 		log.Error("failed to copy the keys and configs of ceph cluster to remote cluster: " + err.Error())
 	}
@@ -230,7 +233,7 @@ func (r *ReplicationDriver) CreateReplication(opt *pb.CreateReplicationOpts) (*m
 
 	// Copy the keys and configs of remote cluster to ceph cluster. The rbd-mirror in the secondary cluster requires the key from the primary and vice versa.
 
-	peercmd := "scp " + r.conf.FilePath + "remote.client.remote.keyring " + r.conf.FilePath + "remote.conf root@" + r.conf.IPaddresshost + ":" + r.conf.FilePath
+	peercmd := "scp " + r.conf.PeerfilePath + "remote.client.remote.keyring " + r.conf.PeerfilePath + "remote.conf root@" + r.conf.IPaddresshost + ":" + r.conf.HostfilePath
 
 	if err := backupscpsession.Run(peercmd); err != nil {
 		log.Error("failed to copy the keys and configs of remote cluster to ceph cluster: " + err.Error())
